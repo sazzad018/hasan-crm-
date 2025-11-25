@@ -1,0 +1,5 @@
+{
+  "name": "WP Messenger Sync Prototype",
+  "description": "A React prototype demonstrating the admin interface and data handling logic for a Facebook Messenger to WordPress integration plugin.",
+  "requestFramePermissions": []
+}
