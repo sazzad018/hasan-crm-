@@ -1,7 +1,7 @@
 
 import React, { useState, useRef } from 'react';
 import { Conversation } from '../types';
-import { Printer, Download, Plus, Trash2, Calendar, User, FileText, ChevronDown } from 'lucide-react';
+import { Printer, Download, Plus, Trash2, Calendar, User, FileText, ChevronDown, MapPin, Mail, Phone } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface InvoiceItem {
@@ -17,16 +17,15 @@ interface InvoiceGeneratorProps {
 }
 
 const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({ conversations }) => {
-  // Company Information (Fixed)
+  // Company Information (English)
   const companyInfo = {
     name: "Social Ads Expert",
-    phone: "01798205143",
-    address: "চন্দ্রিমা মডেল টাউন, রোড # ৫, ব্লক # এ, মোহাম্মদপুর, ঢাকা।"
+    phone: "+880 1798-205143",
+    address: "Chandrima Model Town, Road # 5, Block # A, Mohammadpur, Dhaka."
   };
 
   const [invoiceNumber, setInvoiceNumber] = useState(`INV-${format(new Date(), 'yyMMdd')}-001`);
   const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
-  const [dueDate, setDueDate] = useState(format(new Date(Date.now() + 86400000 * 7), 'yyyy-MM-dd')); // +7 days
   
   // Client Selection State
   const [selectedClientId, setSelectedClientId] = useState<string>('');
@@ -132,20 +131,22 @@ const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({ conversations }) =>
                   value={clientName}
                   onChange={(e) => setClientName(e.target.value)}
                 />
-                <input 
-                  placeholder="Phone Number" 
-                  className="w-full border border-slate-200 rounded px-3 py-2 text-sm outline-none focus:border-blue-500"
-                  value={clientPhone}
-                  onChange={(e) => setClientPhone(e.target.value)}
-                />
-                <input 
-                  placeholder="Email Address" 
-                  className="w-full border border-slate-200 rounded px-3 py-2 text-sm outline-none focus:border-blue-500"
-                  value={clientEmail}
-                  onChange={(e) => setClientEmail(e.target.value)}
-                />
+                <div className="grid grid-cols-2 gap-3">
+                  <input 
+                    placeholder="Phone Number" 
+                    className="w-full border border-slate-200 rounded px-3 py-2 text-sm outline-none focus:border-blue-500"
+                    value={clientPhone}
+                    onChange={(e) => setClientPhone(e.target.value)}
+                  />
+                  <input 
+                    placeholder="Email Address" 
+                    className="w-full border border-slate-200 rounded px-3 py-2 text-sm outline-none focus:border-blue-500"
+                    value={clientEmail}
+                    onChange={(e) => setClientEmail(e.target.value)}
+                  />
+                </div>
                 <textarea 
-                  placeholder="Address" 
+                  placeholder="Billing Address" 
                   rows={2}
                   className="w-full border border-slate-200 rounded px-3 py-2 text-sm outline-none focus:border-blue-500 resize-none"
                   value={clientAddress}
@@ -279,54 +280,59 @@ const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({ conversations }) =>
               
               {/* Header */}
               <div>
-                  <div className="flex justify-between items-start mb-8">
+                  <div className="flex justify-between items-start mb-8 border-b-2 border-slate-800 pb-6">
                       <div>
-                          <h1 className="text-3xl font-bold text-blue-600 uppercase tracking-wide mb-2">{companyInfo.name}</h1>
+                          <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight mb-2 uppercase">{companyInfo.name}</h1>
                           <div className="text-sm text-slate-500 space-y-1">
-                              <p className="font-medium text-slate-700">{companyInfo.address}</p>
-                              <p>Phone: {companyInfo.phone}</p>
-                              <p>Email: contact@socialadsexpert.com</p>
+                              <p className="font-medium text-slate-700 flex items-center gap-2"><MapPin size={14} /> {companyInfo.address}</p>
+                              <p className="flex items-center gap-2"><Phone size={14} /> {companyInfo.phone}</p>
+                              <p className="flex items-center gap-2"><Mail size={14} /> contact@socialadsexpert.com</p>
                           </div>
                       </div>
                       <div className="text-right">
-                          <h2 className="text-4xl font-light text-slate-200 uppercase tracking-widest mb-2">Invoice</h2>
+                          <div className="bg-slate-900 text-white px-4 py-1 inline-block mb-3">
+                             <h2 className="text-xl font-bold uppercase tracking-widest">INVOICE</h2>
+                          </div>
                           <p className="font-mono font-bold text-slate-700 text-lg">#{invoiceNumber}</p>
-                          <p className="text-sm text-slate-500">Date: {format(new Date(date), 'MMMM d, yyyy')}</p>
+                          <p className="text-sm text-slate-500 mt-1">Date: <span className="font-semibold text-slate-700">{format(new Date(date), 'MMMM d, yyyy')}</span></p>
                       </div>
                   </div>
 
-                  <hr className="border-slate-100 mb-8" />
-
                   {/* Bill To */}
-                  <div className="mb-10">
-                      <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Bill To</p>
-                      <h3 className="text-xl font-bold text-slate-800 mb-1">{clientName || 'Client Name'}</h3>
-                      <div className="text-sm text-slate-600 space-y-0.5">
-                          {clientAddress && <p>{clientAddress}</p>}
-                          {clientPhone && <p>Phone: {clientPhone}</p>}
-                          {clientEmail && <p>Email: {clientEmail}</p>}
+                  <div className="mb-10 bg-slate-50 p-6 rounded-xl border border-slate-100 flex justify-between items-start">
+                      <div className="flex-1">
+                          <p className="text-xs font-bold text-blue-600 uppercase tracking-wider mb-3">Invoice To</p>
+                          <h3 className="text-xl font-bold text-slate-900 mb-2">{clientName || 'Client Name'}</h3>
+                          <div className="text-sm text-slate-600 space-y-1.5">
+                              {clientAddress && <p className="max-w-xs">{clientAddress}</p>}
+                              {clientPhone && <p><span className="font-semibold text-slate-500">Phone:</span> {clientPhone}</p>}
+                              {clientEmail && <p><span className="font-semibold text-slate-500">Email:</span> {clientEmail}</p>}
+                          </div>
+                      </div>
+                      <div className="text-right">
+                          {/* Could place Due Date here if needed */}
                       </div>
                   </div>
 
                   {/* Items Table */}
                   <table className="w-full mb-8">
                       <thead>
-                          <tr className="bg-slate-50 border-y border-slate-200">
-                              <th className="py-3 pl-4 text-left text-xs font-bold text-slate-500 uppercase w-12">#</th>
-                              <th className="py-3 text-left text-xs font-bold text-slate-500 uppercase">Description</th>
-                              <th className="py-3 text-right text-xs font-bold text-slate-500 uppercase w-24">Price</th>
-                              <th className="py-3 text-center text-xs font-bold text-slate-500 uppercase w-16">Qty</th>
-                              <th className="py-3 pr-4 text-right text-xs font-bold text-slate-500 uppercase w-32">Total</th>
+                          <tr className="bg-slate-100 text-slate-700 border-y border-slate-200">
+                              <th className="py-3 pl-4 text-left text-xs font-extrabold uppercase w-12">#</th>
+                              <th className="py-3 text-left text-xs font-extrabold uppercase">Description</th>
+                              <th className="py-3 text-right text-xs font-extrabold uppercase w-24">Rate</th>
+                              <th className="py-3 text-center text-xs font-extrabold uppercase w-16">Qty</th>
+                              <th className="py-3 pr-4 text-right text-xs font-extrabold uppercase w-32">Total</th>
                           </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
                           {items.map((item, idx) => (
                               <tr key={item.id}>
-                                  <td className="py-4 pl-4 text-sm text-slate-400">{idx + 1}</td>
-                                  <td className="py-4 text-sm font-medium text-slate-700">{item.description}</td>
+                                  <td className="py-4 pl-4 text-sm text-slate-400 font-medium">{idx + 1}</td>
+                                  <td className="py-4 text-sm font-bold text-slate-700">{item.description}</td>
                                   <td className="py-4 text-right text-sm text-slate-600">{item.rate.toLocaleString()}</td>
                                   <td className="py-4 text-center text-sm text-slate-600">{item.quantity}</td>
-                                  <td className="py-4 pr-4 text-right text-sm font-bold text-slate-800">{item.amount.toLocaleString()}</td>
+                                  <td className="py-4 pr-4 text-right text-sm font-bold text-slate-900">{item.amount.toLocaleString()}</td>
                               </tr>
                           ))}
                       </tbody>
@@ -338,38 +344,38 @@ const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({ conversations }) =>
                   <div className="flex justify-end mb-10">
                       <div className="w-64 space-y-3">
                           <div className="flex justify-between text-sm text-slate-600">
-                              <span>Subtotal:</span>
-                              <span className="font-bold">{calculateSubtotal().toLocaleString()} BDT</span>
+                              <span className="font-medium">Subtotal:</span>
+                              <span className="font-bold text-slate-800">{calculateSubtotal().toLocaleString()} BDT</span>
                           </div>
                           {discount > 0 && (
                               <div className="flex justify-between text-sm text-slate-600">
-                                  <span>Discount:</span>
-                                  <span className="text-red-500">-{discount.toLocaleString()} BDT</span>
+                                  <span className="font-medium">Discount:</span>
+                                  <span className="text-red-500 font-bold">-{discount.toLocaleString()} BDT</span>
                               </div>
                           )}
-                          <div className="flex justify-between text-lg font-bold text-slate-800 border-t border-slate-200 pt-3">
+                          <div className="flex justify-between text-lg font-bold text-slate-900 border-t-2 border-slate-800 pt-3 mt-2">
                               <span>Total:</span>
-                              <span className="text-blue-600">{calculateTotal().toLocaleString()} BDT</span>
+                              <span className="text-blue-700">{calculateTotal().toLocaleString()} BDT</span>
                           </div>
                       </div>
                   </div>
 
                   {/* Terms & Signature */}
-                  <div className="grid grid-cols-2 gap-10 border-t border-slate-100 pt-8">
+                  <div className="grid grid-cols-2 gap-10 border-t border-slate-200 pt-8">
                       <div>
                           <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Terms & Notes</p>
-                          <p className="text-sm text-slate-500 leading-relaxed whitespace-pre-wrap">
+                          <p className="text-sm text-slate-500 leading-relaxed whitespace-pre-wrap font-medium">
                               {notes}
                           </p>
                       </div>
                       <div className="text-right flex flex-col items-end justify-end">
-                          <div className="w-40 border-b border-slate-300 mb-2"></div>
-                          <p className="text-xs font-bold text-slate-400 uppercase">Authorized Signature</p>
+                          <div className="w-40 border-b-2 border-slate-300 mb-2"></div>
+                          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Authorized Signature</p>
                       </div>
                   </div>
                   
-                  <div className="text-center mt-12 text-[10px] text-slate-400">
-                      This is a computer generated invoice.
+                  <div className="text-center mt-12 pt-6 border-t border-slate-100 text-[10px] text-slate-400 uppercase tracking-widest">
+                      Thank you for doing business with us
                   </div>
               </div>
           </div>

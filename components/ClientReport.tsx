@@ -819,9 +819,9 @@ const ClientReport: React.FC<ClientReportProps> = ({
                           </div>
                       )}
 
-                      {/* 3. TASKS TAB - IMPLEMENTED */}
+                      {/* 3. TASKS TAB - IMPLEMENTED & FIXED VISIBILITY */}
                       {activeModalTab === 'tasks' && (
-                          <div className="flex flex-col md:flex-row gap-6 h-full">
+                          <div className="flex flex-col md:flex-row gap-6">
                               {/* New Task Form */}
                               <div className="w-full md:w-1/3 space-y-4">
                                   <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
@@ -881,7 +881,7 @@ const ClientReport: React.FC<ClientReportProps> = ({
                               </div>
 
                               {/* Task List */}
-                              <div className="flex-1 bg-white rounded-xl border border-slate-200 shadow-sm p-6 overflow-y-auto">
+                              <div className="flex-1 bg-white rounded-xl border border-slate-200 shadow-sm p-6">
                                   <h4 className="font-bold text-slate-800 mb-4 flex items-center justify-between">
                                       <span>Current Growth Plan</span>
                                       <span className="text-xs bg-slate-100 px-2 py-1 rounded text-slate-500">
