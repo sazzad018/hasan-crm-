@@ -1,21 +1,91 @@
+
 import React, { useState } from 'react';
 import { AdminTask, Conversation } from '../types';
-import { CheckSquare, Square, Trash2, Plus, Calendar, Clock, Briefcase, Filter } from 'lucide-react';
+import { CheckSquare, Square, Trash2, Plus, Calendar, Clock, Briefcase, Filter, MoreHorizontal, GripVertical } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface TaskManagerProps {
     tasks: AdminTask[];
     conversations: Conversation[];
     onAddTask: (title: string, description?: string, relatedClientId?: string) => void;
-    onToggleTask: (taskId: string) => void;
+    onUpdateStatus: (taskId: string, status: 'todo' | 'in_progress' | 'done') => void;
     onDeleteTask: (taskId: string) => void;
 }
 
-const TaskManager: React.FC<TaskManagerProps> = ({ tasks, conversations, onAddTask, onToggleTask, onDeleteTask }) => {
+const UserIcon = () => (
+    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+);
+
+interface TaskCardProps {
+    task: AdminTask;
+    onUpdateStatus: (taskId: string, status: 'todo' | 'in_progress' | 'done') => void;
+    onDeleteTask: (taskId: string) => void;
+}
+
+const TaskCard: React.FC<TaskCardProps> = ({ task, onUpdateStatus, onDeleteTask }) => (
+    <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 hover:shadow-md transition-shadow group animate-in fade-in zoom-in-95 duration-200">
+        <div className="flex justify-between items-start mb-2">
+            <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded ${
+                task.priority === 'high' ? 'bg-red-50 text-red-600' : 
+                task.priority === 'medium' ? 'bg-orange-50 text-orange-600' : 'bg-blue-50 text-blue-600'
+            }`}>
+                {task.priority}
+            </span>
+            <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
+                 <button onClick={() => onDeleteTask(task.id)} className="text-slate-300 hover:text-red-500">
+                     <Trash2 size={14} />
+                 </button>
+            </div>
+        </div>
+        
+        <h4 className={`font-bold text-slate-800 text-sm mb-1 ${task.status === 'done' ? 'line-through text-slate-400' : ''}`}>
+            {task.title}
+        </h4>
+        
+        {task.description && (
+            <p className="text-xs text-slate-500 mb-3 line-clamp-2">{task.description}</p>
+        )}
+
+        {task.relatedClientName && (
+            <div className="flex items-center gap-1.5 mt-2 mb-3 bg-slate-50 w-fit px-2 py-1 rounded text-[10px] text-slate-600 font-medium">
+                <UserIcon /> {task.relatedClientName}
+            </div>
+        )}
+
+        <div className="flex justify-between items-center mt-2 border-t border-slate-100 pt-2">
+             <span className="text-[10px] text-slate-400">{format(task.createdAt, 'MMM d')}</span>
+             
+             <div className="flex gap-1">
+                 {task.status !== 'todo' && (
+                     <button 
+                        onClick={() => onUpdateStatus(task.id, 'todo')}
+                        className="w-2 h-2 rounded-full bg-slate-200 hover:bg-slate-400" 
+                        title="Move to To Do" 
+                     />
+                 )}
+                 {task.status !== 'in_progress' && (
+                     <button 
+                        onClick={() => onUpdateStatus(task.id, 'in_progress')}
+                        className="w-2 h-2 rounded-full bg-blue-200 hover:bg-blue-400" 
+                        title="Move to In Progress" 
+                     />
+                 )}
+                 {task.status !== 'done' && (
+                     <button 
+                        onClick={() => onUpdateStatus(task.id, 'done')}
+                        className="w-2 h-2 rounded-full bg-emerald-200 hover:bg-emerald-400" 
+                        title="Move to Done" 
+                     />
+                 )}
+             </div>
+        </div>
+    </div>
+);
+
+const TaskManager: React.FC<TaskManagerProps> = ({ tasks, conversations, onAddTask, onUpdateStatus, onDeleteTask }) => {
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
     const [selectedClientId, setSelectedClientId] = useState<string>('');
-    const [activeTab, setActiveTab] = useState<'pending' | 'completed'>('pending');
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -27,160 +97,119 @@ const TaskManager: React.FC<TaskManagerProps> = ({ tasks, conversations, onAddTa
         setSelectedClientId('');
     };
 
-    const filteredTasks = tasks.filter(t => activeTab === 'pending' ? !t.isCompleted : t.isCompleted);
-    const completedCount = tasks.filter(t => t.isCompleted).length;
-    const progress = tasks.length > 0 ? Math.round((completedCount / tasks.length) * 100) : 0;
+    const todoTasks = tasks.filter(t => t.status === 'todo');
+    const inProgressTasks = tasks.filter(t => t.status === 'in_progress');
+    const doneTasks = tasks.filter(t => t.status === 'done');
 
     return (
-        <div className="max-w-5xl mx-auto h-full flex flex-col gap-6">
-            <div className="flex flex-col md:flex-row gap-6 h-full">
+        <div className="h-full flex flex-col gap-6">
+            {/* Header / Input Area */}
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row gap-6">
+                 <div className="md:w-1/4">
+                     <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                        <Briefcase className="text-[#9B7BE3]" /> Command Center
+                     </h2>
+                     <p className="text-sm text-slate-500 mt-1">Add tasks and manage agency workflow efficiently.</p>
+                 </div>
+                 
+                 <form onSubmit={handleSubmit} className="flex-1 flex gap-4 items-start">
+                     <div className="flex-1 space-y-3">
+                         <input 
+                            value={title}
+                            onChange={(e) => setTitle(e.target.value)}
+                            placeholder="What needs to be done?"
+                            className="w-full bg-slate-50 border-0 rounded-xl px-4 py-3 text-sm font-medium focus:ring-2 focus:ring-[#9B7BE3] outline-none"
+                         />
+                         <div className="flex gap-3">
+                             <input 
+                                value={description}
+                                onChange={(e) => setDescription(e.target.value)}
+                                placeholder="Details..."
+                                className="flex-1 bg-slate-50 border-0 rounded-xl px-4 py-2 text-xs focus:ring-2 focus:ring-[#9B7BE3] outline-none"
+                             />
+                             <select 
+                                value={selectedClientId}
+                                onChange={(e) => setSelectedClientId(e.target.value)}
+                                className="bg-slate-50 border-0 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-[#9B7BE3] outline-none text-slate-600"
+                             >
+                                <option value="">No Client Linked</option>
+                                {conversations.map(c => <option key={c.psid} value={c.psid}>{c.userName}</option>)}
+                             </select>
+                         </div>
+                     </div>
+                     <button 
+                        type="submit"
+                        disabled={!title.trim()}
+                        className="bg-[#9B7BE3] hover:bg-violet-600 text-white p-4 rounded-xl shadow-lg shadow-violet-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                     >
+                         <Plus size={24} />
+                     </button>
+                 </form>
+            </div>
+
+            {/* Kanban Board */}
+            <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-6 overflow-hidden">
                 
-                {/* Left Column: Input Form */}
-                <div className="w-full md:w-1/3 flex flex-col gap-6">
-                    <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                        <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
-                            <Plus className="text-blue-600" size={20} /> New Daily Task
-                        </h2>
-                        <form onSubmit={handleSubmit} className="space-y-4">
-                            <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Task Title</label>
-                                <input 
-                                    className="w-full border border-slate-200 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                                    placeholder="What needs to be done?"
-                                    value={title}
-                                    onChange={e => setTitle(e.target.value)}
-                                    autoFocus
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Description (Optional)</label>
-                                <textarea 
-                                    className="w-full border border-slate-200 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none h-24 resize-none"
-                                    placeholder="Add details..."
-                                    value={description}
-                                    onChange={e => setDescription(e.target.value)}
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Related Client (Optional)</label>
-                                <select 
-                                    className="w-full border border-slate-200 rounded-lg px-4 py-2.5 text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none"
-                                    value={selectedClientId}
-                                    onChange={e => setSelectedClientId(e.target.value)}
-                                >
-                                    <option value="">-- General Task --</option>
-                                    {conversations.map(c => (
-                                        <option key={c.psid} value={c.psid}>{c.userName}</option>
-                                    ))}
-                                </select>
-                            </div>
-                            <button 
-                                type="submit" 
-                                disabled={!title.trim()}
-                                className="w-full bg-slate-900 text-white font-bold py-3 rounded-xl hover:bg-black transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                Add to List
-                            </button>
-                        </form>
+                {/* To Do Column */}
+                <div className="flex flex-col h-full bg-slate-50/50 rounded-2xl border border-slate-200">
+                    <div className="p-4 border-b border-slate-200 bg-white/50 backdrop-blur sticky top-0 z-10 flex justify-between items-center">
+                        <h3 className="font-bold text-slate-700 text-sm uppercase tracking-wider flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full bg-slate-400"></span> To Do
+                        </h3>
+                        <span className="bg-slate-100 text-slate-600 text-[10px] font-bold px-2 py-0.5 rounded-full">{todoTasks.length}</span>
                     </div>
-
-                    <div className="bg-gradient-to-br from-indigo-600 to-violet-600 rounded-xl p-6 text-white shadow-lg">
-                        <h3 className="font-bold text-lg mb-2">Today's Progress</h3>
-                        <div className="flex justify-between text-sm font-medium opacity-90 mb-2">
-                            <span>{completedCount} / {tasks.length} Completed</span>
-                            <span>{progress}%</span>
-                        </div>
-                        <div className="w-full bg-black/20 rounded-full h-3 overflow-hidden">
-                            <div className="bg-white h-full rounded-full transition-all duration-500" style={{ width: `${progress}%` }}></div>
-                        </div>
-                        <p className="text-xs mt-4 opacity-80 leading-relaxed">
-                            "Focus on being productive instead of busy."
-                        </p>
+                    <div className="p-4 space-y-3 overflow-y-auto flex-1 custom-scrollbar">
+                        {todoTasks.map(t => (
+                            <TaskCard 
+                                key={t.id} 
+                                task={t} 
+                                onDeleteTask={onDeleteTask} 
+                                onUpdateStatus={onUpdateStatus} 
+                            />
+                        ))}
                     </div>
                 </div>
 
-                {/* Right Column: Task List */}
-                <div className="flex-1 bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col overflow-hidden">
-                    <div className="p-4 border-b border-slate-100 flex items-center justify-between">
-                        <div className="flex gap-2">
-                            <button 
-                                onClick={() => setActiveTab('pending')}
-                                className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${activeTab === 'pending' ? 'bg-blue-50 text-blue-600' : 'text-slate-500 hover:bg-slate-50'}`}
-                            >
-                                Pending
-                            </button>
-                            <button 
-                                onClick={() => setActiveTab('completed')}
-                                className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${activeTab === 'completed' ? 'bg-emerald-50 text-emerald-600' : 'text-slate-500 hover:bg-slate-50'}`}
-                            >
-                                Completed
-                            </button>
-                        </div>
-                        <span className="text-xs text-slate-400 font-medium">
-                            {filteredTasks.length} Tasks
-                        </span>
+                {/* In Progress Column */}
+                <div className="flex flex-col h-full bg-blue-50/30 rounded-2xl border border-blue-100">
+                    <div className="p-4 border-b border-blue-100 bg-white/50 backdrop-blur sticky top-0 z-10 flex justify-between items-center">
+                        <h3 className="font-bold text-blue-700 text-sm uppercase tracking-wider flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span> In Progress
+                        </h3>
+                        <span className="bg-blue-100 text-blue-600 text-[10px] font-bold px-2 py-0.5 rounded-full">{inProgressTasks.length}</span>
                     </div>
-
-                    <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50/50">
-                        {filteredTasks.length > 0 ? (
-                            filteredTasks.map(task => (
-                                <div 
-                                    key={task.id}
-                                    className={`bg-white p-4 rounded-xl border transition-all flex items-start gap-4 group ${task.isCompleted ? 'border-emerald-100 opacity-70' : 'border-slate-200 hover:border-blue-300 shadow-sm'}`}
-                                >
-                                    <button 
-                                        onClick={() => onToggleTask(task.id)}
-                                        className={`mt-1 transition-colors ${task.isCompleted ? 'text-emerald-500' : 'text-slate-300 hover:text-blue-500'}`}
-                                    >
-                                        {task.isCompleted ? <CheckSquare size={24} /> : <Square size={24} />}
-                                    </button>
-                                    
-                                    <div className="flex-1">
-                                        <div className="flex justify-between items-start">
-                                            <h4 className={`font-bold text-base ${task.isCompleted ? 'text-slate-500 line-through' : 'text-slate-800'}`}>
-                                                {task.title}
-                                            </h4>
-                                            <span className="text-[10px] text-slate-400 font-mono whitespace-nowrap ml-2">
-                                                {format(task.createdAt, 'h:mm a')}
-                                            </span>
-                                        </div>
-                                        
-                                        {task.description && (
-                                            <p className="text-sm text-slate-500 mt-1 leading-relaxed">
-                                                {task.description}
-                                            </p>
-                                        )}
-                                        
-                                        {task.relatedClientName && (
-                                            <div className="mt-3 flex items-center gap-2">
-                                                <div className="bg-violet-50 text-violet-700 px-2 py-1 rounded text-xs font-bold flex items-center gap-1 border border-violet-100">
-                                                    <Briefcase size={12} />
-                                                    {task.relatedClientName}
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    <button 
-                                        onClick={() => onDeleteTask(task.id)}
-                                        className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity p-2 hover:bg-red-50 rounded-lg"
-                                        title="Delete Task"
-                                    >
-                                        <Trash2 size={18} />
-                                    </button>
-                                </div>
-                            ))
-                        ) : (
-                            <div className="h-full flex flex-col items-center justify-center text-slate-400 py-12">
-                                <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-4">
-                                    <Filter size={24} className="opacity-30" />
-                                </div>
-                                <p className="font-medium">No {activeTab} tasks found.</p>
-                                {activeTab === 'pending' && <p className="text-sm mt-1">Great job! You're all caught up.</p>}
-                            </div>
-                        )}
+                    <div className="p-4 space-y-3 overflow-y-auto flex-1 custom-scrollbar">
+                        {inProgressTasks.map(t => (
+                            <TaskCard 
+                                key={t.id} 
+                                task={t} 
+                                onDeleteTask={onDeleteTask} 
+                                onUpdateStatus={onUpdateStatus} 
+                            />
+                        ))}
                     </div>
                 </div>
+
+                {/* Done Column */}
+                <div className="flex flex-col h-full bg-emerald-50/30 rounded-2xl border border-emerald-100">
+                    <div className="p-4 border-b border-emerald-100 bg-white/50 backdrop-blur sticky top-0 z-10 flex justify-between items-center">
+                        <h3 className="font-bold text-emerald-700 text-sm uppercase tracking-wider flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full bg-emerald-500"></span> Done
+                        </h3>
+                        <span className="bg-emerald-100 text-emerald-600 text-[10px] font-bold px-2 py-0.5 rounded-full">{doneTasks.length}</span>
+                    </div>
+                    <div className="p-4 space-y-3 overflow-y-auto flex-1 custom-scrollbar">
+                        {doneTasks.map(t => (
+                            <TaskCard 
+                                key={t.id} 
+                                task={t} 
+                                onDeleteTask={onDeleteTask} 
+                                onUpdateStatus={onUpdateStatus} 
+                            />
+                        ))}
+                    </div>
+                </div>
+
             </div>
         </div>
     );

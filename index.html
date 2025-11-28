@@ -26,45 +26,54 @@
         background: #94a3b8; 
       }
       
-      /* Print Styles for Invoice PDF Generation */
+      /* Print Styles for Invoice/PDF Generation */
       @media print {
         @page { margin: 0; size: auto; }
-        body { background: white; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         
-        /* Hide UI elements */
-        aside, header, .no-print, button, input, textarea, select, ::-webkit-scrollbar { 
-          display: none !important; 
+        /* Hide everything by default */
+        body { 
+            background: white; 
+            margin: 0;
+            padding: 0;
+        }
+        
+        body * {
+            visibility: hidden;
+            height: 0; /* Collapse height of hidden elements */
+            overflow: hidden; 
         }
 
-        /* Reset Layout */
-        #root { height: auto; overflow: visible; }
-        main { 
-          margin: 0 !important; 
-          padding: 0 !important; 
-          height: auto !important; 
-          overflow: visible !important; 
-          width: 100% !important;
+        /* Whitelist the printable area */
+        .invoice-preview, .invoice-preview * {
+            visibility: visible;
+            height: auto;
+            overflow: visible;
         }
 
-        /* Ensure Invoice Preview takes full width */
+        /* Position it absolutely to cover everything */
         .invoice-preview {
-          display: block !important;
-          position: relative !important;
-          top: 0 !important;
-          left: 0 !important;
-          width: 100% !important;
-          max-width: 100% !important;
-          margin: 0 !important;
-          padding: 40px !important;
-          border: none !important;
-          box-shadow: none !important;
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 100% !important;
+            margin: 0 !important;
+            z-index: 9999 !important;
+            background: white !important;
+            box-shadow: none !important;
+            display: block !important;
+        }
+
+        /* Force colors to print correctly */
+        * {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
         }
         
-        /* Force background colors to print */
+        /* Ensure background colors work for Tailwind classes */
         .bg-slate-900 { background-color: #0f172a !important; color: white !important; }
         .bg-blue-600 { background-color: #2563eb !important; color: white !important; }
-        .text-blue-600 { color: #2563eb !important; }
-        .bg-slate-50 { background-color: #f8fafc !important; }
+        .bg-violet-600 { background-color: #7c3aed !important; color: white !important; }
+        .bg-[#9B7BE3] { background-color: #9B7BE3 !important; color: white !important; }
       }
     </style>
   <script type="importmap">
@@ -74,7 +83,8 @@
     "react": "https://aistudiocdn.com/react@^19.2.0",
     "lucide-react": "https://aistudiocdn.com/lucide-react@^0.554.0",
     "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
-    "date-fns": "https://aistudiocdn.com/date-fns@^4.1.0"
+    "date-fns": "https://aistudiocdn.com/date-fns@^4.1.0",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0"
   }
 }
 </script>

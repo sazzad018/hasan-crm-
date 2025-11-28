@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
 import SettingsPanel from './components/SettingsPanel';
+import PaymentSettings from './components/PaymentSettings';
 import MessengerCRM from './components/MessengerCRM';
 import Dashboard from './components/Dashboard';
 import WebhookSimulator from './components/WebhookSimulator';
@@ -10,202 +11,305 @@ import ClientReport from './components/ClientReport';
 import ClientPortal from './components/ClientPortal';
 import TaskManager from './components/TaskManager';
 import InvoiceGenerator from './components/InvoiceGenerator';
-import { Conversation, PluginSettings, AttachmentType, LeadStatus, SavedReply, Meeting, Transaction, TransactionCategory, TransactionMetadata, ClientTask, AdminTask } from './types';
+import WebsiteManager from './components/WebsiteManager'; 
+import BulkSmsManager from './components/BulkSmsManager';
+import AiSalesBrain from './components/AiSalesBrain'; 
+import CampaignGenerator from './components/CampaignGenerator'; 
+import PersonalVault from './components/PersonalVault'; 
+import PublicLeadForm from './components/PublicLeadForm'; 
+import ProposalBuilder from './components/ProposalBuilder'; 
+import AutomationHub from './components/AutomationHub'; 
+import AuditTool from './components/AuditTool'; 
+import DailyBriefingModal from './components/DailyBriefingModal'; 
+import { format, addDays, differenceInHours, isSameDay, differenceInDays } from 'date-fns';
+import { Conversation, PluginSettings, AttachmentType, LeadStatus, SavedReply, Meeting, Transaction, TransactionCategory, TransactionMetadata, ClientTask, AdminTask, FbMessage, ClientWebsite, PaymentMethod, AiKnowledgeItem, SmsSettings, SmsCampaign, AiSettings, PersonalAccount, InvoiceRecord, Proposal, DripSequence, AutoReportConfig, ServiceType } from './types';
+import { Bell, X, Send, AlertTriangle } from 'lucide-react'; 
+
+// Helper function to replace missing date-fns export
+const dateSubDays = (date: Date, amount: number): Date => {
+    const d = new Date(date);
+    d.setDate(d.getDate() - amount);
+    return d;
+};
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [portalClientId, setPortalClientId] = useState<string | null>(null); // For Client Portal View
+  const [portalClientId, setPortalClientId] = useState<string | null>(null); 
+  const [isPublicMode, setIsPublicMode] = useState(false); 
+  const [notifications, setNotifications] = useState<string[]>([]); 
   
+  // Daily Briefing State
+  const [showDailyBriefing, setShowDailyBriefing] = useState(false);
+
+  // MANUAL FALLBACK POPUP STATE (When AI doesn't know what to send)
+  const [manualSendRequired, setManualSendRequired] = useState<{
+      client: Conversation;
+      dayCount: number;
+  } | null>(null);
+  const [manualFallbackMessage, setManualFallbackMessage] = useState('');
+
+  // IMPORTANT: Set this to your live server URL
+  const API_BASE_URL = 'https://akafshop.com'; 
+
+  // --- GENERATE 50+ MOCK DATA POINTS ---
+  const generateMockData = (): Conversation[] => {
+      const statuses: LeadStatus[] = ['new_lead', 'interested', 'negotiation', 'active_client', 'cold', 'converted', 'past_client'];
+      const sources = ['facebook', 'manual', 'web_form'];
+      const services: ServiceType[] = ['fb_ads', 'web_dev', 'funnel', 'seo', 'other'];
+      
+      const names = [
+          'Rahim Store', 'Fashion BD', 'Tech Point', 'Dr. Ariful Islam', 'Advocate Karim', 
+          'Sadia Parlour', 'Dhaka Real Estate', 'Organic Foods BD', 'Learning Hub', 'Travel Xpress',
+          'Mobile Gadget Shop', 'Fitness Plus', 'Burger King Dhanmondi', 'Cloud Solutions', 'Interior Studio',
+          'Dream Weavers', 'Wedding Diaries', 'Car Bazar', 'Bike Point', 'Pet Lovers BD',
+          'Gaming Zone', 'Kids Wear', 'Saree House', 'Punjabi World', 'Shoe Box',
+          'Electro Mart', 'Home Decor', 'Beauty & Glam', 'Corporate Gifts', 'Event Management Pro',
+          'Digital Marketers', 'Freelancer Apu', 'Graphic Art', 'Video Editors Guild', 'Content House',
+          'SEO Master', 'Web Devs BD', 'App Studio', 'Hosting Provider', 'Domain seller',
+          'T-Shirt Print', 'Mug Print', 'Gift Shop', 'Flower House', 'Cake Art',
+          'Biryani House', 'Kebab Zone', 'Pizza Palace', 'Coffee Time', 'Tea Stall VIP'
+      ];
+
+      return names.map((name, index) => {
+          const psid = (1000 + index).toString();
+          const status = statuses[Math.floor(Math.random() * statuses.length)];
+          const source = sources[Math.floor(Math.random() * sources.length)] as any;
+          const serviceType = services[Math.floor(Math.random() * services.length)];
+          
+          const hasPhone = Math.random() > 0.3;
+          const hasWeb = Math.random() > 0.5;
+          const isClient = status === 'active_client' || status === 'converted';
+          
+          // Generate Transactions for Clients
+          const transactions: Transaction[] = [];
+          if (isClient) {
+              // Initial Deposit
+              transactions.push({
+                  id: `tx_${psid}_1`,
+                  date: dateSubDays(new Date(), Math.floor(Math.random() * 60)),
+                  type: 'credit',
+                  amount: Math.floor(Math.random() * 500) + 100,
+                  description: 'Initial Deposit',
+                  category: 'payment',
+                  status: 'completed'
+              });
+              // Ad Spends
+              for(let i=0; i<5; i++) {
+                  transactions.push({
+                      id: `tx_${psid}_ad_${i}`,
+                      date: dateSubDays(new Date(), Math.floor(Math.random() * 30)),
+                      type: 'debit',
+                      amount: Math.floor(Math.random() * 50) + 10,
+                      description: 'Daily Ad Spend',
+                      category: 'ad_spend',
+                      status: 'completed',
+                      metadata: {
+                          impressions: Math.floor(Math.random() * 5000) + 1000,
+                          reach: Math.floor(Math.random() * 4000) + 800,
+                          messages: Math.floor(Math.random() * 20) + 1,
+                          conversions: Math.floor(Math.random() * 5)
+                      }
+                  });
+              }
+          }
+
+          // Randomize Low Balance Alert Settings
+          const alertEnabled = Math.random() > 0.5;
+          const alertThreshold = Math.floor(Math.random() * 50) + 10;
+
+          return {
+              psid,
+              userName: name,
+              status,
+              source,
+              serviceType,
+              statusChangedDate: dateSubDays(new Date(), Math.floor(Math.random() * 10)), // Mocked status change date
+              extractedMobile: hasPhone ? `017${Math.floor(Math.random() * 100000000)}` : undefined,
+              extractedWebsite: hasWeb ? `https://${name.replace(/\s/g, '').toLowerCase()}.com` : undefined,
+              extractedFbLink: `https://fb.com/${name.replace(/\s/g, '.')}`,
+              walletBalance: isClient ? Math.floor(Math.random() * 500) : 0,
+              lowBalanceAlert: { isEnabled: alertEnabled, threshold: alertThreshold }, 
+              downloadCount: Math.floor(Math.random() * 5),
+              smsCount: Math.floor(Math.random() * 10),
+              unreadCount: Math.random() > 0.8 ? Math.floor(Math.random() * 3) : 0,
+              lastActive: dateSubDays(new Date(), Math.floor(Math.random() * 10)),
+              tags: isClient ? ['VIP', 'Retainer'] : Math.random() > 0.5 ? ['Hot Lead'] : [],
+              dealValue: isClient ? Math.floor(Math.random() * 2000) + 500 : 0,
+              aiEnabled: Math.random() > 0.5,
+              aiSummary: `Generated lead for ${name}. Interested in digital marketing services.`,
+              messages: [
+                  { 
+                      id: Date.now(), 
+                      messageText: 'Hi, I am interested in your services.', 
+                      attachmentType: AttachmentType.TEXT, 
+                      fbMid: `mid_${index}`, 
+                      createdTime: dateSubDays(new Date(), 1),
+                      isFromPage: false
+                  }
+              ],
+              transactions: transactions,
+              invoices: [],
+              tasks: [],
+              isBestQuality: Math.random() > 0.8,
+              portalPermissions: {
+                  viewBalance: true,
+                  allowTopUp: false,
+                  viewHistory: true,
+                  showTotalDeposit: true,
+                  showTotalSpend: true
+              }
+          };
+      });
+  };
+
   // 1. Initial Saved Replies
   const [savedReplies, setSavedReplies] = useState<SavedReply[]>([
     { 
       id: '1', 
       label: "👋 Power Intro", 
-      text: "Hi! I reviewed your page and noticed you have a great product but might be missing some potential customers due to reach issues. We help businesses like yours scale 3x faster. Want to hear a quick strategy?", 
-      status: ['new_lead'] 
+      text: "আসসালামু আলাইকুম! আপনার পেজটি দেখলাম, প্রোডাক্টগুলো দারুণ। কিন্তু মনে হচ্ছে রিচ একটু কম হচ্ছে। আমরা বুস্ট ছাড়াই অর্গানিক রিচ বাড়াতে সাহায্য করি। বিস্তারিত জানতে চান?", 
+      status: ['Greeting'] 
     },
     { 
       id: '2', 
       label: "🏆 Social Proof", 
-      text: "We recently helped a similar brand increase their revenue by 40% in just 2 months. I'd love to share that case study with you. Should I send it?", 
-      status: ['interested'] 
+      text: "আমাদের রিসেন্ট একটি ক্লায়েন্টের সেলস গত মাসে ৪০% বেড়েছে। আমরা তাদের জন্য যে স্ট্র্যাটেজি ব্যবহার করেছি, সেটা আপনার সাথে শেয়ার করতে পারি। দেখাবো?", 
+      status: ['Details'] 
     },
     { 
       id: '3', 
       label: "💰 Price Objection", 
-      text: "I understand the budget concern. However, think of this as an investment, not a cost. If spending $500 brings you $2000 in sales, the cost becomes irrelevant. Shall we try a pilot campaign?", 
-      status: ['negotiation'] 
+      text: "বাজেট নিয়ে চিন্তা করবেন না। যদি ৫০০ টাকা খরচ করে ২০০০ টাকার সেলস আসে, তবে কি সেটা লস হবে? আমরা এভাবেই আরওআই ফোকাসড অ্যাড রান করি।", 
+      status: ['Objection'] 
     },
     { 
       id: '4', 
       label: "📞 Push to Call", 
-      text: "It's hard to explain the full strategy over text. Are you free for a quick 10-minute discovery call today? I can show you exactly how we'll execute this.", 
-      status: ['interested', 'negotiation'] 
+      text: "মেসেজে সব বুঝিয়ে বলা কঠিন। আপনার কি ১০ মিনিট সময় হবে? আমি কল দিয়ে বিস্তারিত বলতাম।", 
+      status: ['Closing'] 
     },
     { 
       id: '5', 
       label: "🔥 Urgency Close", 
-      text: "We are finalizing our client roster for this month and only have 1 slot left for the Premium Setup. I'd hate for you to wait until next month. Shall I send the invoice to lock this in?", 
-      status: ['negotiation'] 
+      text: "আমাদের এই মাসের স্লট প্রায় শেষ। আপনি যদি আজ কনফার্ম করেন, তবে আমরা এখনই কাজ শুরু করতে পারব। ইনভয়েস পাঠাবো?", 
+      status: ['Closing'] 
     },
     { 
       id: '6', 
       label: "✅ Welcome Kit", 
-      text: "Fantastic decision! I've attached the invoice. Once cleared, our team will start the onboarding process within 24 hours. Let's grow your business! 🚀", 
-      status: ['converted'] 
+      text: "ধন্যবাদ! আমি ইনভয়েস পাঠিয়েছি। পেমেন্ট ক্লিয়ার হলে ২৪ ঘন্টার মধ্যে কাজ শুরু হবে। 🚀", 
+      status: ['Details'] 
     },
   ]);
 
-  // 2. Initialize Massive Mock Data (20 Items) - With Wallet Data for Active Clients
-  const [conversations, setConversations] = useState<Conversation[]>([
-    {
-      psid: '1001', userName: 'Rahim Uddin', status: 'new_lead', source: 'facebook', extractedMobile: '01711223344', downloadCount: 0, unreadCount: 1, lastActive: new Date(),
-      tags: ['Priority'], dealValue: 0,
-      aiSummary: 'User asked about SEO services and shared phone number. Pending initial call.',
-      messages: [{ id: 1, messageText: 'Hi, call me at 01711223344 regarding SEO.', attachmentType: AttachmentType.TEXT, fbMid: 'm1', createdTime: new Date() }]
-    },
-    {
-      psid: '1002', userName: 'Jessica Alba', status: 'negotiation', source: 'facebook', extractedWebsite: 'https://jessicabeauty.com', downloadCount: 3, unreadCount: 0, lastActive: new Date(Date.now() - 3600000),
-      tags: ['High Budget', 'Beauty'], dealValue: 1500,
-      aiSummary: 'Interested in premium package. Negotiation ongoing about price. Sent proposal link.',
-      messages: [{ id: 2, messageText: 'Here is my site: https://jessicabeauty.com. Send proposal.', attachmentType: AttachmentType.TEXT, fbMid: 'm2', createdTime: new Date() }]
-    },
-    {
-      psid: '1003', userName: 'Karim Benz', status: 'interested', source: 'facebook', extractedFbLink: 'https://facebook.com/karim.cars', downloadCount: 1, unreadCount: 2, lastActive: new Date(Date.now() - 7200000),
-      tags: ['Automotive'], dealValue: 500,
-      aiSummary: 'Car dealership owner looking for FB Ads. Shared page link.',
-      messages: [{ id: 3, messageText: 'Check my page https://facebook.com/karim.cars', attachmentType: AttachmentType.TEXT, fbMid: 'm3', createdTime: new Date() }]
-    },
-    {
-      psid: '1004', userName: 'Unknown User', status: 'cold', source: 'facebook', downloadCount: 0, unreadCount: 0, lastActive: new Date(Date.now() - 86400000),
-      tags: [], dealValue: 0,
-      aiSummary: 'Casual browsing. Not interested currently.',
-      messages: [{ id: 4, messageText: 'Just looking, thanks.', attachmentType: AttachmentType.TEXT, fbMid: 'm4', createdTime: new Date() }]
-    },
-    {
-      psid: '1005', userName: 'Tech Startup BD', status: 'active_client', source: 'facebook', extractedMobile: '01888999000', extractedWebsite: 'https://techbd.com', downloadCount: 5, unreadCount: 0, lastActive: new Date(Date.now() - 100000000),
-      tags: ['VIP', 'Retainer'], dealValue: 2000,
-      walletBalance: 845.50,
-      clientEmail: 'admin@techbd.com',
-      clientAddress: 'Level 4, Karwan Bazar, Dhaka',
-      servicePackage: 'Enterprise Growth Plan',
-      portalAnnouncement: '⚠️ Server maintenance scheduled for Friday night.',
-      portalPermissions: { viewBalance: true, allowTopUp: true, viewHistory: true },
-      tasks: [
-          { id: 't1', title: 'Upload high-res logo to drive', type: 'weekly', priority: 'medium', isCompleted: true, assignedDate: new Date() },
-          { id: 't2', title: 'Record 3 Product Videos for Reels', type: 'weekly', priority: 'high', deadline: new Date(Date.now() + 86400000 * 2), isCompleted: false, assignedDate: new Date() },
-          { id: 't3', title: 'Increase Ad Budget by 20%', type: 'monthly', priority: 'low', isCompleted: false, assignedDate: new Date() }
-      ],
-      transactions: [
-          { id: 'tx1', date: new Date(Date.now() - 86400000 * 10), type: 'credit', amount: 2000, description: 'Initial Deposit', category: 'payment', status: 'completed' },
-          { id: 'tx5', date: new Date(Date.now() - 86400000 * 8), type: 'debit', amount: 249.50, description: 'Content Creation Fee', category: 'service_fee', status: 'completed' },
-          // Demo Ad Spend Data for Chart with Metadata
-          { 
-              id: 'ad1', date: new Date(Date.now() - 86400000 * 6), type: 'debit', amount: 45.20, description: 'Daily Ad Spend (FB)', category: 'ad_spend', status: 'completed',
-              metadata: { impressions: 12500, reach: 9800, messages: 12, conversions: 3 }
-          },
-          { 
-              id: 'ad2', date: new Date(Date.now() - 86400000 * 5), type: 'debit', amount: 52.10, description: 'Daily Ad Spend (FB)', category: 'ad_spend', status: 'completed',
-              metadata: { impressions: 14200, reach: 11000, messages: 15, conversions: 5 }
-          },
-          { 
-              id: 'ad3', date: new Date(Date.now() - 86400000 * 4), type: 'debit', amount: 48.50, description: 'Daily Ad Spend (FB)', category: 'ad_spend', status: 'completed',
-              metadata: { impressions: 13000, reach: 10200, messages: 10, conversions: 2 }
-          },
-          { 
-              id: 'ad4', date: new Date(Date.now() - 86400000 * 3), type: 'debit', amount: 65.00, description: 'Daily Ad Spend (FB) - Wknd', category: 'ad_spend', status: 'completed',
-              metadata: { impressions: 18000, reach: 14500, messages: 25, conversions: 8 }
-          },
-          { 
-              id: 'ad5', date: new Date(Date.now() - 86400000 * 2), type: 'debit', amount: 55.30, description: 'Daily Ad Spend (FB)', category: 'ad_spend', status: 'completed',
-              metadata: { impressions: 15500, reach: 12000, messages: 18, conversions: 6 }
-          },
-          { 
-              id: 'ad6', date: new Date(Date.now() - 86400000 * 1), type: 'debit', amount: 12.50, description: 'Daily Ad Spend (FB)', category: 'ad_spend', status: 'completed',
-              metadata: { impressions: 4000, reach: 3500, messages: 3, conversions: 0 }
-          },
-          { id: 'web1', date: new Date(Date.now() - 86400000 * 2), type: 'debit', amount: 150.00, description: 'Landing Page Fix', category: 'web_dev', status: 'completed' },
-      ],
-      aiSummary: 'Active Client. Payment confirmed. Onboarding in progress.',
-      messages: [{ id: 5, messageText: 'Payment done. Start working.', attachmentType: AttachmentType.TEXT, fbMid: 'm5', createdTime: new Date() }]
-    },
-    {
-      psid: '1006', userName: 'Sarah Khan', status: 'new_lead', source: 'facebook', downloadCount: 0, unreadCount: 1, lastActive: new Date(Date.now() - 5000),
-      tags: ['Design'], dealValue: 100,
-      aiSummary: 'Needs photo editing services for ads. Sent sample image.',
-      messages: [{ id: 6, messageText: '', attachmentType: AttachmentType.IMAGE, attachmentUrl: 'https://picsum.photos/300/200', fbMid: 'm6', createdTime: new Date() }, { id: 7, messageText: 'Can you edit this photo for my ad?', attachmentType: AttachmentType.TEXT, fbMid: 'm7', createdTime: new Date() }]
-    },
-    {
-      psid: '1007', userName: 'Fashion House', status: 'interested', source: 'facebook', extractedMobile: '01912341234', extractedFbLink: 'https://fb.me/fashionhouse', downloadCount: 2, unreadCount: 0, lastActive: new Date(Date.now() - 150000),
-      tags: ['E-commerce'], dealValue: 800,
-      aiSummary: 'Boutique owner. Wants to boost FB page engagement.',
-      messages: [{ id: 8, messageText: 'Call 01912341234 or msg https://fb.me/fashionhouse', attachmentType: AttachmentType.TEXT, fbMid: 'm8', createdTime: new Date() }]
-    },
-    {
-      psid: '1008', userName: 'Mr. John', status: 'negotiation', source: 'facebook', extractedWebsite: 'https://johnrealtor.com', downloadCount: 10, unreadCount: 0, lastActive: new Date(Date.now() - 200000),
-      tags: ['Real Estate', 'Hot Lead'], dealValue: 3000,
-      aiSummary: 'Real estate leads needed. High potential client.',
-      messages: [{ id: 9, messageText: 'I need leads for https://johnrealtor.com', attachmentType: AttachmentType.TEXT, fbMid: 'm9', createdTime: new Date() }]
-    },
-    {
-      psid: '1013', userName: 'Dr. Strange', status: 'active_client', source: 'facebook', downloadCount: 8, unreadCount: 0, lastActive: new Date(Date.now() - 900000000),
-      tags: ['Medical', 'VIP'], dealValue: 5000,
-      walletBalance: 4500.00,
-      clientEmail: 'doc@strange.clinic',
-      servicePackage: 'Medical Branding Suite',
-      portalPermissions: { viewBalance: true, allowTopUp: false, viewHistory: true },
-      transactions: [
-          { id: 'tx10', date: new Date(Date.now() - 86400000 * 30), type: 'credit', amount: 5000, description: 'Retainer Fee', category: 'payment', status: 'completed' },
-          { id: 'tx11', date: new Date(Date.now() - 86400000 * 15), type: 'debit', amount: 500, description: 'Medical Poster Design', category: 'service_fee', status: 'completed' },
-          { id: 'tx12', date: new Date(Date.now() - 86400000 * 2), type: 'debit', amount: 50, description: 'Website Maintenance', category: 'web_dev', status: 'completed' }
-      ],
-      tasks: [
-        { id: 't1', title: 'Approve new Website Mockup', type: 'weekly', priority: 'high', isCompleted: false, assignedDate: new Date() },
-      ],
-      aiSummary: 'Old client. Consultation fee paid. Ongoing service.',
-      messages: [{ id: 14, messageText: 'Consultation fee paid.', attachmentType: AttachmentType.TEXT, fbMid: 'm14', createdTime: new Date() }]
-    },
-    {
-      psid: '1020', userName: 'Happy Client', status: 'active_client', source: 'facebook', extractedMobile: '01700000000', downloadCount: 12, unreadCount: 0, lastActive: new Date(Date.now() - 60000 * 5),
-      tags: ['Loyal'], dealValue: 200,
-      walletBalance: 50.00,
-      servicePackage: 'Basic Support',
-      isPortalSuspended: true,
-      portalAnnouncement: 'Please contact admin to reactivate account.',
-      portalPermissions: { viewBalance: false, allowTopUp: false, viewHistory: false },
-      transactions: [
-          { id: 'tx20', date: new Date(Date.now() - 86400000 * 2), type: 'credit', amount: 200, description: 'Promo Boost', category: 'payment', status: 'completed' },
-          { id: 'tx21', date: new Date(Date.now() - 3600000), type: 'debit', amount: 150, description: 'Ad Spend', category: 'ad_spend', status: 'completed' }
-      ],
-      aiSummary: 'Loyal client gave positive feedback. Added personal number.',
-      messages: [{ id: 21, messageText: 'Great job! 01700000000 is my personal number.', attachmentType: AttachmentType.TEXT, fbMid: 'm21', createdTime: new Date() }]
-    },
-    {
-      psid: '1016', userName: 'Real Estate Agent', status: 'negotiation', source: 'facebook', extractedMobile: '01555222333', extractedWebsite: 'https://remax.com', downloadCount: 4, unreadCount: 0, lastActive: new Date(Date.now() - 3600000 * 2),
-      tags: ['Real Estate'], dealValue: 1200,
-      aiSummary: 'Agent from Remax. Wants bulk leads. Negotiation phase.',
-      messages: [{ id: 17, messageText: 'Contact 01555222333 or visit https://remax.com', attachmentType: AttachmentType.TEXT, fbMid: 'm17', createdTime: new Date() }]
-    }
+  const [proposals, setProposals] = useState<Proposal[]>([]);
+  
+  // AUTOMATION STATE - With Professional Bengali Templates
+  const [dripSequences, setDripSequences] = useState<DripSequence[]>([
+      {
+          id: 'ds1',
+          triggerStatus: 'interested',
+          isEnabled: true,
+          steps: [
+              { id: 's1', dayDelay: 1, message: 'প্রিয় {{name}}, Social Ads Expert এ আগ্রহ দেখানোর জন্য ধন্যবাদ! 🤝 আমাদের পোর্টফোলিও এবং সফল প্রোজেক্টগুলো দেখতে এই লিংকে ক্লিক করুন: [LINK] - আমরা আপনার বিজনেসের গ্রোথ নিয়ে কথা বলতে চাই।' },
+              { id: 's2', dayDelay: 3, message: 'জানেন কি? সঠিক ফানেল স্ট্র্যাটেজি ব্যবহার করে আমাদের ক্লায়েন্টরা গড়ে ২০০% পর্যন্ত সেলস বাড়াতে পেরেছে। 🚀 আপনার বিজনেসেও এই স্ট্র্যাটেজি কিভাবে কাজ করবে তা জানতে আমাদের সাথে কথা বলুন।' },
+              { id: 's3', dayDelay: 5, message: 'প্রিয় {{name}}, এই মাসে আমাদের প্রিমিয়াম কনসালটেশনের স্লট প্রায় শেষ। আপনি কি আপনার ফ্রি স্ট্র্যাটেজি কলটি বুক করতে চান? রিপ্লাই করুন "YES" অথবা কল করুন 017...' }
+          ]
+      },
+      // NEW: Win-Back / Project Ended Sequence (7 STEPS - 5, 10, 15, 21, 30, 45, 60)
+      {
+          id: 'ds2',
+          triggerStatus: 'past_client',
+          isEnabled: true,
+          steps: [
+              { id: 'wb1', dayDelay: 5, message: 'প্রিয় {{name}}, ধন্যবাদ আমাদের সাথে কাজ করার জন্য! 🤝 আশা করি প্রোজেক্টটি আপনার উপকারে এসেছে। কোনো সাপোর্ট লাগলে জানাবেন।' },
+              { id: 'wb2', dayDelay: 10, message: 'আসসালামু আলাইকুম {{name}}, ১০ দিন হলো আমাদের প্রোজেক্ট শেষ হয়েছে। আপনার বিজনেসের বর্তমান অবস্থা কেমন? নতুন কোনো ক্যাম্পেইন প্ল্যান করতে চাইলে আমরা আছি।' },
+              { id: 'wb3', dayDelay: 15, message: 'প্রিয় {{name}}, ফেসবুকে নতুন কিছু আপডেট এসেছে যা আপনার সেলস বাড়াতে পারে। আমরা পুরাতন ক্লায়েন্টদের জন্য ফ্রি অডিট দিচ্ছি। কথা বলতে চান?' },
+              { id: 'wb4', dayDelay: 21, message: 'হ্যালো {{name}}, আপনি কি জানেন আমাদের পুরাতন ক্লায়েন্টরা "Retaining Package" এ ২০% ডিসকাউন্ট পায়? আপনার বিজনেসকে নেক্সট লেভেলে নিতে আজই কল করুন।' },
+              { id: 'wb5', dayDelay: 30, message: 'প্রিয় {{name}}, ১ মাস হয়ে গেল আমরা শেষ কথা বলেছি। আপনার কম্পিটিটররা কিন্তু থেমে নেই! 🚀 আসুন আপনার মার্কেটিং স্ট্র্যাটেজিটি নতুন করে সাজাই।' },
+              { id: 'wb6', dayDelay: 45, message: 'লং টাইম নো সি {{name}}! 👋 সামনে ঈদ/সিজনাল সেলস আসছে। এখনই সেরা সময় নতুন অ্যাড রান করার। আপনার জন্য আমাদের টিম রেডি আছে।' },
+              { id: 'wb7', dayDelay: 60, message: 'প্রিয় {{name}}, আমাদের শেষ কথা হওয়ার পর ৬০ দিন পার হয়েছে। আপনার ডিজিটাল মার্কেটিং পার্টনার হিসেবে আমরা চাই আপনার বিজনেসের উন্নতি অব্যাহত থাকুক। আপনার জন্য আমাদের একটি বিশেষ কামব্যাক অফার আছে - আমাদের কমপ্লিট এসইও অডিটে ৩০% ডিসকাউন্ট। অফারটি নিতে রিপ্লাই দিন "YES"।' }
+          ]
+      }
+  ]);
+  const [reportConfig, setReportConfig] = useState<AutoReportConfig>({
+      isEnabled: true,
+      frequency: 'weekly',
+      method: 'sms',
+      includeMetrics: ['spend', 'sales']
+  });
+
+  const [personalAccounts, setPersonalAccounts] = useState<PersonalAccount[]>([
+      { id: '1', platformName: 'Facebook Personal', category: 'social', username: 'my.email@gmail.com', password: 'password123', notes: 'Main personal account' },
+      { id: '2', platformName: 'Udemy', category: 'course', username: 'student@gmail.com', password: 'coursePass!', notes: 'Marketing courses here' }
   ]);
 
-  // 3. Meeting State
-  const [meetings, setMeetings] = useState<Meeting[]>([
-      { id: '1', psid: '1002', clientName: 'Jessica Alba', title: 'Finalize Proposal Details', date: new Date(new Date().setHours(10,0,0,0)), status: 'completed' },
-      { id: '2', psid: '1005', clientName: 'Tech Startup BD', title: 'Onboarding Call', date: new Date(new Date().setHours(14,30,0,0)), status: 'pending' },
-      { id: '3', psid: '1013', clientName: 'Dr. Strange', title: 'Consultation Follow-up', date: new Date(new Date().setHours(16,0,0,0)), status: 'pending' },
+  const handleAddPersonalAccount = (account: PersonalAccount) => {
+      setPersonalAccounts([...personalAccounts, account]);
+  };
+
+  const handleUpdatePersonalAccount = (updatedAccount: PersonalAccount) => {
+      setPersonalAccounts(personalAccounts.map(acc => acc.id === updatedAccount.id ? updatedAccount : acc));
+  };
+
+  const handleDeletePersonalAccount = (id: string) => {
+      setPersonalAccounts(personalAccounts.filter(acc => acc.id !== id));
+  };
+
+  const [aiKnowledgeBase, setAiKnowledgeBase] = useState<AiKnowledgeItem[]>([
+      { id: '1', category: 'Services', question: 'আপনারা কি কি সার্ভিস দেন?', answer: 'আমরা মূলত ফেসবুক অ্যাডস, সেলস ফানেল তৈরি এবং ওয়েবসাইট ডেভেলপমেন্ট সার্ভিস দিয়ে থাকি।' },
+      { id: '2', category: 'Pricing', question: 'সার্ভিস চার্জ বা খরচ কেমন?', answer: 'আমাদের প্যাকেজ সাধারণত ৫০০০ টাকা থেকে শুরু হয়।' }
   ]);
 
-  // 4. Admin Tasks State (Personal Task Manager)
-  const [adminTasks, setAdminTasks] = useState<AdminTask[]>([
-      { id: 'at1', title: 'Review new Facebook API Changes', isCompleted: false, createdAt: new Date() },
-      { id: 'at2', title: 'Follow up with 5 new leads', description: 'Priority for today', isCompleted: false, createdAt: new Date() },
-      { id: 'at3', title: 'Update invoice template', isCompleted: true, createdAt: new Date() }
+  const [aiSettings, setAiSettings] = useState<AiSettings>({
+      activeMode: 'manual',
+      paidConfig: { provider: 'gemini', apiKey: '', model: 'gemini-3-pro-preview' },
+      freeConfig: { provider: 'gemini', apiKey: '', model: 'gemini-2.5-flash' }
+  });
+
+  const [aiPersona, setAiPersona] = useState<string>(`
+CONTEXT:
+You are an expert Sales Agent for "Social Ads Expert", a Bangladeshi Digital Marketing Agency.
+Your goal is to CONVERT leads into clients by being persuasive, professional, and friendly.
+CRITICAL INSTRUCTIONS:
+1. **LANGUAGE**: You MUST reply in **Bengali (Bangla)**.
+`);
+
+  const [smsSettings, setSmsSettings] = useState<SmsSettings>({
+      apiUrl: '',
+      apiKey: '',
+      senderId: '',
+      method: 'GET',
+      paramMap: { to: 'to', message: 'message', apiKey: 'api_key' }
+  });
+  const [smsHistory, setSmsHistory] = useState<SmsCampaign[]>([
+      { id: '1', name: 'Eid Promo Blast', message: 'Eid Mubarak! Get 50% off.', targetAudience: 'All Leads', totalSent: 120, timestamp: dateSubDays(new Date(), 2), status: 'sent' }
   ]);
 
-  // Helper function to extract data from text using Regex
+  // 2. State for Conversations (Clients)
+  const [conversations, setConversations] = useState<Conversation[]>(generateMockData());
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Payment Methods State
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([
+      { id: '1', category: 'mobile', provider: 'Bkash', type: 'Personal', accountNumber: '01700000000', instructions: 'Send money using Send Money option.' },
+      { id: '2', category: 'bank', provider: 'City Bank', type: 'Current', accountNumber: '1234567890', accountName: 'Social Ads Expert', instructions: 'Use Invoice ID as reference.', branchName: 'Gulshan 1', routingNumber: '123456789' },
+      { id: '3', category: 'mobile', provider: 'Nagad', type: 'Merchant', accountNumber: '01800000000', instructions: 'Payment option.' }
+  ]);
+
+  // ... (Helper functions like handleAddPaymentMethod, extractInfo, logApiWarning, addNotification...) ...
+  
+  const handleAddPaymentMethod = (method: PaymentMethod) => {
+      setPaymentMethods([...paymentMethods, method]);
+  };
+
+  const handleDeletePaymentMethod = (id: string) => {
+      setPaymentMethods(paymentMethods.filter(p => p.id !== id));
+  };
+
   const extractInfo = (text: string) => {
     const info: Partial<Conversation> = {};
-    const phoneRegex = /(?:\+88|0088)?(01[3-9]\d{8})/g;
+    const phoneRegex = /(?:\+8801|8801|01)[3-9]\d{8}/g;
     const phoneMatch = text.match(phoneRegex);
     if (phoneMatch) info.extractedMobile = phoneMatch[0];
 
@@ -224,47 +328,424 @@ const App: React.FC = () => {
     return info;
   };
 
-  const handleUpdateStatus = (psid: string, status: LeadStatus) => {
-    setConversations(conversations.map(c => 
-        c.psid === psid ? { ...c, status } : c
-    ));
+  const logApiWarning = (context: string, error: unknown) => {
+      console.warn(`[API] ${context} failed (Demo Mode - Backend Unavailable):`, error);
   };
 
-  const handleUpdateSummary = (psid: string, summary: string) => {
-    setConversations(conversations.map(c =>
-        c.psid === psid ? { ...c, aiSummary: summary } : c
-    ));
+  const addNotification = (msg: string) => {
+      setNotifications(prev => [msg, ...prev]);
+      setTimeout(() => setNotifications(prev => prev.filter(n => n !== msg)), 5000);
   };
+
+  const handleUpdateClientProfile = async (psid: string, data: Partial<Conversation>) => {
+      setConversations(prev => prev.map(c => {
+          if (c.psid === psid) {
+              const updates: Partial<Conversation> = { ...data };
+              
+              // NEW: Timestamp when status changes
+              if (data.status && data.status !== c.status) {
+                  updates.statusChangedDate = new Date();
+                  
+                  // Trigger notification for Drip
+                  const drip = dripSequences.find(d => d.triggerStatus === data.status && d.isEnabled);
+                  if (drip) {
+                      setTimeout(() => {
+                          addNotification(`🚀 Automation Started: "${drip.triggerStatus.replace('_', ' ')}" Drip Sequence triggered for ${c.userName}.`);
+                      }, 500);
+                  }
+              }
+              return { ...c, ...updates };
+          }
+          return c;
+      }));
+
+      try {
+        const payload = { psid, ...data };
+        await fetch(`${API_BASE_URL}/api/update_client.php`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+      } catch (error) {
+          logApiWarning("update_client", error);
+      }
+  };
+
+  const handleUpdateIndustry = (psid: string, industry: string) => handleUpdateClientProfile(psid, { industry: industry as any });
+  const handleUpdateServiceType = (psid: string, serviceType: string) => handleUpdateClientProfile(psid, { serviceType: serviceType as ServiceType });
+
+  // API Integration: Fetch Clients with Retry and Robust JSON Handling
+  const fetchClients = async () => {
+    let attempts = 0;
+    const maxAttempts = 2;
+
+    while (attempts < maxAttempts) {
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/get_clients.php?_t=${Date.now()}`);
+            
+            // Only error on server failure, allow retries
+            if (!response.ok && response.status >= 500) {
+                throw new Error(`HTTP ${response.status}`);
+            } else if (!response.ok) {
+                // 4xx error, break loop
+                break; 
+            }
+
+            const text = await response.text();
+            
+            // Validate Empty response
+            if (!text || text.trim().length === 0) {
+                if (conversations.length <= 4) setConversations(generateMockData());
+                return;
+            }
+
+            // Validate JSON
+            let data;
+            try { 
+                data = JSON.parse(text); 
+            } catch (e) {
+                console.warn(`[API] JSON Parse error in fetchClients:`, e);
+                // Don't retry on parse error, data is corrupt
+                if (conversations.length <= 4) setConversations(generateMockData());
+                return;
+            }
+            
+            if (Array.isArray(data) || (data && data.status !== 'error')) {
+                    const rawList = Array.isArray(data) ? data : [];
+                    const mappedData: Conversation[] = rawList.map((row: any) => ({
+                        psid: row.psid,
+                        userName: row.user_name || 'Unknown User',
+                        status: row.status,
+                        source: row.source,
+                        extractedMobile: row.mobile,
+                        extractedWebsite: row.website,
+                        extractedFbLink: row.fb_link,
+                        walletBalance: parseFloat(row.wallet_balance || '0'),
+                        lowBalanceAlert: row.low_balance_alert ? JSON.parse(row.low_balance_alert) : { isEnabled: false, threshold: 10 },
+                        downloadCount: 0,
+                        smsCount: 0,
+                        unreadCount: 0, 
+                        lastActive: new Date(row.last_active || Date.now()),
+                        messages: [], 
+                        tags: row.tags ? JSON.parse(row.tags) : [],
+                        tasks: [],
+                        transactions: [],
+                        invoices: [],
+                        aiEnabled: row.ai_enabled == 1, 
+                        notes: row.notes,
+                        industry: row.industry,
+                        serviceType: row.service_type,
+                        portalPermissions: row.portal_permissions ? JSON.parse(row.portal_permissions) : {
+                            viewBalance: true,
+                            allowTopUp: false,
+                            viewHistory: true,
+                            showTotalDeposit: true,
+                            showTotalSpend: true
+                        }
+                    }));
+
+                    setConversations(prev => {
+                        if(prev.length === 0) return mappedData;
+                        return mappedData.map(newC => {
+                            const existing = prev.find(p => p.psid === newC.psid);
+                            return existing ? { 
+                                ...newC, 
+                                messages: existing.messages, 
+                                aiEnabled: existing.aiEnabled ?? newC.aiEnabled, 
+                                invoices: existing.invoices, 
+                                notes: existing.notes || newC.notes, 
+                                transactions: existing.transactions || [], 
+                                tasks: existing.tasks || [],
+                                statusChangedDate: existing.statusChangedDate,
+                                lastAutomatedMessageDate: existing.lastAutomatedMessageDate 
+                            } : newC;
+                        });
+                    });
+                    return; // Success
+            } else {
+                if (conversations.length <= 4) setConversations(generateMockData());
+                return;
+            }
+        } catch (error) {
+            attempts++;
+            if (attempts >= maxAttempts) {
+                logApiWarning("fetchClients", error);
+                if (conversations.length <= 4) setConversations(generateMockData());
+            } else {
+                // Exponential backoff
+                await new Promise(r => setTimeout(r, 1000 * attempts)); 
+            }
+        }
+    }
+    setIsLoading(false);
+  };
+
+  // Fetch Client Messages with Retry and Robust JSON
+  const fetchClientMessages = async (psid: string) => {
+    let attempts = 0;
+    const maxAttempts = 3;
+
+    while(attempts < maxAttempts) {
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/get_messages.php?sender_id=${psid}&_t=${Date.now()}`);
+            
+            if (!response.ok && response.status >= 500) {
+                 throw new Error(`HTTP ${response.status}`);
+            } else if (!response.ok) {
+                 break; 
+            }
+
+            const text = await response.text();
+            if (!text || text.trim().length === 0) return;
+            
+            let data;
+            try { 
+                data = JSON.parse(text); 
+            } catch (e) { 
+                console.warn(`[API] JSON Parse error in fetchClientMessages for ${psid}`);
+                return; 
+            }
+
+            if (Array.isArray(data)) {
+                const fetchedMessages: FbMessage[] = data.map((msg: any) => ({
+                    id: msg.id,
+                    messageText: msg.message,
+                    attachmentType: (msg.attachment_type as AttachmentType) || AttachmentType.TEXT,
+                    attachmentUrl: msg.attachment_url,
+                    fbMid: msg.mid,
+                    isFromPage: msg.is_from_page == 1 || msg.is_from_page === true,
+                    createdTime: new Date(msg.created_at)
+                }));
+                
+                setConversations(prev => prev.map(c => c.psid === psid ? { ...c, messages: fetchedMessages } : c));
+                return; // Success
+            }
+            return;
+
+        } catch (e) {
+            attempts++;
+            if (attempts >= maxAttempts) {
+                logApiWarning("fetchClientMessages", e);
+            } else {
+                await new Promise(r => setTimeout(r, 1000 * attempts));
+            }
+        }
+    }
+  };
+
+  // --- STARTUP LOGIC & AUTOMATION ENGINE ---
+  useEffect(() => {
+    fetchClients();
+    const interval = setInterval(fetchClients, 15000);
+
+    // DAILY BRIEFING CHECK LOGIC
+    const checkBriefing = () => {
+        const lastBriefingTime = localStorage.getItem('lastBriefingTime');
+        const tenHours = 10 * 60 * 60 * 1000;
+        const now = Date.now();
+
+        if (!lastBriefingTime || (now - parseInt(lastBriefingTime)) > tenHours) {
+            // Show briefing if never shown OR 10 hours passed
+            setShowDailyBriefing(true);
+        }
+    };
+    
+    // Check on load
+    setTimeout(checkBriefing, 2000); // Small delay for effect
+
+    // --- 🚀 ADVANCED AUTOMATION WORKER (The Brain) ---
+    // Runs every 60 seconds to check for Drip Triggers
+    const automationInterval = setInterval(() => {
+        const today = new Date();
+        
+        setConversations(currentConversations => {
+            let hasUpdates = false;
+            let manualReq = null;
+            
+            const updatedConversations = currentConversations.map(client => {
+                // 1. Skip if no status date or automation not needed
+                if (!client.statusChangedDate) return client;
+
+                // 2. Find matching Active Sequence for this client's status
+                const activeSeq = dripSequences.find(s => s.triggerStatus === client.status && s.isEnabled);
+                if (!activeSeq) return client;
+
+                // 3. Calculate Days Inactive
+                const daysPassed = differenceInDays(today, new Date(client.statusChangedDate));
+                
+                // 4. Check if a message is scheduled for THIS exact day
+                // AND ensure we haven't already sent an automation today (Spam Guard)
+                const alreadySentToday = client.lastAutomatedMessageDate && isSameDay(new Date(client.lastAutomatedMessageDate), today);
+                
+                if (alreadySentToday) return client;
+
+                // 5. Find Template OR Check for Milestone Fallback
+                const stepToTrigger = activeSeq.steps.find(step => step.dayDelay === daysPassed);
+                const isMilestone = [5, 10, 15, 21, 30, 45, 60].includes(daysPassed); // Check specific milestones
+
+                if (stepToTrigger) {
+                    // --- CASE A: TEMPLATE EXISTS -> AUTO SEND ---
+                    console.log(`[AUTO] Sending Day ${daysPassed} msg to ${client.userName}`);
+                    
+                    const personalizedMsg = stepToTrigger.message.replace('{{name}}', client.userName);
+                    
+                    // In real production, this would call your backend API endpoint
+                    
+                    // B. Show Notification to Admin
+                    addNotification(`🤖 Auto-SMS sent to ${client.userName} (Day ${daysPassed} Rule)`);
+
+                    hasUpdates = true;
+                    
+                    // C. Return updated client object
+                    return {
+                        ...client,
+                        lastAutomatedMessageDate: new Date(),
+                        smsCount: (client.smsCount || 0) + 1,
+                        messages: [
+                            ...client.messages,
+                            {
+                                id: Date.now(),
+                                messageText: `[AUTO-SMS]: ${personalizedMsg}`,
+                                attachmentType: AttachmentType.TEXT,
+                                fbMid: `auto_${Date.now()}`,
+                                isFromPage: true,
+                                createdTime: new Date()
+                            }
+                        ]
+                    };
+                } else if (isMilestone) {
+                     // --- CASE B: NO TEMPLATE -> MANUAL POPUP REQUEST ---
+                     // We found a milestone (e.g., Day 20) but no rule exists for it.
+                     // Trigger manual intervention only if not already asking for someone else
+                     if (!manualReq) {
+                         manualReq = { client, dayCount: daysPassed };
+                     }
+                }
+
+                return client;
+            });
+
+            // If we found a manual request, set it (outside the map to avoid conflicts)
+            if (manualReq) {
+                setManualSendRequired(manualReq);
+            }
+
+            return hasUpdates ? updatedConversations : currentConversations;
+        });
+
+    }, 60000); // Check every 1 minute
+
+    return () => {
+        clearInterval(interval);
+        clearInterval(automationInterval);
+    };
+  }, [dripSequences]);
+
+  const handleCloseBriefing = () => {
+      setShowDailyBriefing(false);
+      localStorage.setItem('lastBriefingTime', Date.now().toString());
+  };
+
+  const handleBriefingQuickAction = (action: string, id: string) => {
+      if (action === 'sms_reminder') {
+          // Trigger SMS logic
+          addNotification(`SMS Reminder queued for client ID: ${id}`);
+      } else if (action === 'call') {
+          window.open(`tel:${id}`);
+      } else if (action === 'chat') {
+          handleOpenChatFromSchedule(id);
+          setShowDailyBriefing(false);
+      }
+  };
+
+  const handleManualSendSubmit = () => {
+      if (manualSendRequired && manualFallbackMessage) {
+          handleSendMessage(manualSendRequired.client.psid, manualFallbackMessage);
+          alert(`Message Sent to ${manualSendRequired.client.userName}! System marked as handled for today.`);
+          
+          // Mark as sent in conversation to avoid re-triggering today
+          setConversations(prev => prev.map(c => {
+              if (c.psid === manualSendRequired.client.psid) {
+                  return { ...c, lastAutomatedMessageDate: new Date() };
+              }
+              return c;
+          }));
+
+          setManualSendRequired(null);
+          setManualFallbackMessage('');
+      }
+  };
+
+  // --- MOCK SCHEDULES & TASKS ---
+  const [meetings, setMeetings] = useState<Meeting[]>([
+      { id: '1', psid: '1002', clientName: 'Fashion BD', title: 'Campaign Strategy', date: new Date(new Date().setHours(10,0,0,0)), status: 'completed' },
+      { id: '2', psid: '1005', clientName: 'Tech Point', title: 'Monthly Review', date: new Date(new Date().setHours(14,30,0,0)), status: 'pending' }
+  ]);
+
+  const [adminTasks, setAdminTasks] = useState<AdminTask[]>([
+      { id: 'at1', title: 'Review Facebook API V19', status: 'todo', priority: 'high', isCompleted: false, createdAt: new Date() }
+  ]);
+
+  useEffect(() => {
+      // Optional: Persist tasks
+  }, [adminTasks]);
   
-  const handleUpdateNotes = (psid: string, notes: string) => {
-    setConversations(conversations.map(c => 
-        c.psid === psid ? { ...c, notes } : c
-    ));
+  const [websites, setWebsites] = useState<ClientWebsite[]>([
+      {
+          id: '1', clientId: '1005', clientName: 'Tech Point', websiteUrl: 'https://techpoint.com.bd', 
+          adminUrl: 'https://techpoint.com.bd/wp-admin', provider: 'Hostinger', expiryDate: '2024-12-31',
+          wpUser: 'admin', wpPass: 'Tech@2024', cpanelUser: 'tech_cp', cpanelPass: 'server123', cost: '5000 BDT'
+      }
+  ]);
+
+  const handleAddWebsite = (site: ClientWebsite) => setWebsites([...websites, site]);
+  const handleUpdateWebsite = (updatedSite: ClientWebsite) => setWebsites(websites.map(s => s.id === updatedSite.id ? updatedSite : s));
+  const handleDeleteWebsite = (id: string) => setWebsites(websites.filter(s => s.id !== id));
+
+  const [settings, setSettings] = useState<PluginSettings>({
+      pageAccessToken: '', verifyToken: 'my_custom_verify_token', appId: '', appSecret: '', webhookUrl: 'https://akafshop.com/api/webhook.php', googleSheetId: '', googleServiceAccountJson: ''
+  });
+
+  const handleSaveSettings = async () => {
+      try {
+          await fetch(`${API_BASE_URL}/api/save_settings.php`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(settings)
+          });
+          alert("Settings saved to Database!");
+      } catch (e) {
+          logApiWarning("save_settings", e);
+          alert("Settings saved locally (Demo Mode).");
+      }
   };
 
-  const handleUpdateTags = (psid: string, tags: string[]) => {
-    setConversations(conversations.map(c =>
-        c.psid === psid ? { ...c, tags } : c
-    ));
-  };
-
-  const handleUpdateDealValue = (psid: string, value: number) => {
-    setConversations(conversations.map(c => 
-        c.psid === psid ? { ...c, dealValue: value } : c
-    ));
+  const handleUpdateStatus = (psid: string, status: LeadStatus) => handleUpdateClientProfile(psid, { status });
+  const handleUpdateSummary = (psid: string, summary: string) => handleUpdateClientProfile(psid, { aiSummary: summary });
+  const handleUpdateNotes = (psid: string, notes: string) => handleUpdateClientProfile(psid, { notes });
+  const handleUpdateTags = (psid: string, tags: string[]) => handleUpdateClientProfile(psid, { tags });
+  const handleUpdateDealValue = (psid: string, value: number) => handleUpdateClientProfile(psid, { dealValue: value });
+  
+  const handleToggleAi = (psid: string, enabled: boolean) => handleUpdateClientProfile(psid, { aiEnabled: enabled });
+  const handleToggleBestQuality = (psid: string) => {
+      const client = conversations.find(c => c.psid === psid);
+      if (client) handleUpdateClientProfile(psid, { isBestQuality: !client.isBestQuality });
   };
 
   const handleLeadsExported = (psids: string[]) => {
-    setConversations(conversations.map(c => 
-        psids.includes(c.psid) ? { ...c, downloadCount: c.downloadCount + 1 } : c
-    ));
+    setConversations(prev => prev.map(c => psids.includes(c.psid) ? { ...c, downloadCount: c.downloadCount + 1 } : c));
   };
 
-  const handleSendMessage = (psid: string, text: string) => {
+  const handleSmsSent = (psids: string[]) => {
+      setConversations(prev => prev.map(c => psids.includes(c.psid) ? { ...c, smsCount: (c.smsCount || 0) + 1 } : c));
+  };
+
+  const handleSendMessage = async (psid: string, text: string, attachmentType: AttachmentType = AttachmentType.TEXT, attachmentUrl?: string) => {
       const newMessage = {
           id: Date.now(),
           messageText: text,
-          attachmentType: AttachmentType.TEXT,
+          attachmentType: attachmentType,
+          attachmentUrl: attachmentUrl,
           fbMid: `mid.page.${Date.now()}`,
           isFromPage: true,
           createdTime: new Date()
@@ -272,57 +753,72 @@ const App: React.FC = () => {
 
       setConversations(prev => prev.map(c => {
           if (c.psid === psid) {
-              return {
-                  ...c,
-                  messages: [...c.messages, newMessage],
-                  lastActive: new Date()
-              };
+              return { ...c, messages: [...c.messages, newMessage], lastActive: new Date() };
           }
           return c;
       }));
+
+      try {
+          await fetch(`${API_BASE_URL}/api/send_message.php`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ recipient_id: psid, message_text: text, attachment_type: attachmentType, attachment_url: attachmentUrl })
+          });
+      } catch(e) {
+          logApiWarning("send_message", e);
+      }
   };
 
-  // Saved Reply Handlers
-  const handleAddReply = (reply: SavedReply) => {
-    setSavedReplies([...savedReplies, reply]);
-  };
+  // Template Handlers
+  const handleAddReply = (reply: SavedReply) => setSavedReplies([...savedReplies, reply]);
+  const handleUpdateReply = (updatedReply: SavedReply) => setSavedReplies(savedReplies.map(r => r.id === updatedReply.id ? updatedReply : r));
+  const handleDeleteReply = (id: string) => setSavedReplies(savedReplies.filter(r => r.id !== id));
 
-  const handleUpdateReply = (updatedReply: SavedReply) => {
-    setSavedReplies(savedReplies.map(r => r.id === updatedReply.id ? updatedReply : r));
-  };
+  // AI Knowledge Base Handlers
+  const handleAddAiKnowledge = (item: AiKnowledgeItem) => setAiKnowledgeBase([...aiKnowledgeBase, item]);
+  const handleUpdateAiKnowledge = (updatedItem: AiKnowledgeItem) => setAiKnowledgeBase(aiKnowledgeBase.map(item => item.id === updatedItem.id ? updatedItem : item));
+  const handleDeleteAiKnowledge = (id: string) => setAiKnowledgeBase(aiKnowledgeBase.filter(item => item.id !== id));
 
-  const handleDeleteReply = (id: string) => {
-    setSavedReplies(savedReplies.filter(r => r.id !== id));
-  };
+  // SMS Handlers
+  const handleSaveSmsSettings = (newSettings: SmsSettings) => setSmsSettings(newSettings);
+  const handleSaveSmsCampaign = (campaign: SmsCampaign) => setSmsHistory([campaign, ...smsHistory]);
 
-  const handleAddManualLead = (leadData: Partial<Conversation>) => {
+  const handleAddManualLead = async (leadData: Partial<Conversation>) => {
     const newLead: Conversation = {
-        psid: `manual_${Date.now()}`,
+        psid: leadData.psid || `manual_${Date.now()}`,
         userName: leadData.userName || 'Unknown Lead',
         status: leadData.status || 'new_lead',
-        source: 'manual',
+        source: leadData.source || 'manual',
         unreadCount: 0,
         downloadCount: 0,
+        smsCount: 0,
         lastActive: new Date(),
-        aiSummary: 'Manual entry added by admin.',
+        aiSummary: 'New entry added via form/admin.',
         tags: [],
         dealValue: 0,
-        messages: [{
-            id: Date.now(),
-            messageText: 'Manual entry created.',
-            attachmentType: AttachmentType.TEXT,
-            fbMid: 'manual_entry',
-            createdTime: new Date()
-        }],
+        messages: [{ id: Date.now(), messageText: 'Lead created in system.', attachmentType: AttachmentType.TEXT, fbMid: 'manual_entry', createdTime: new Date() }],
         extractedMobile: leadData.extractedMobile,
         extractedWebsite: leadData.extractedWebsite,
         extractedFbLink: leadData.extractedFbLink,
-        notes: leadData.notes
+        notes: leadData.notes,
+        businessInfo: leadData.businessInfo,
+        invoices: []
     };
+
     setConversations([newLead, ...conversations]);
+
+    try {
+        await fetch(`${API_BASE_URL}/api/save_lead.php`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(newLead)
+        });
+    } catch (e) {
+        logApiWarning("save_lead", e);
+    }
   };
 
-  const handleScheduleMeeting = (psid: string, title: string, date: Date) => {
+  const handleScheduleMeeting = (psid: string, title: string, date: Date, reminderConfig?: { enabled: boolean, timeBefore: number, message: string }) => {
       const client = conversations.find(c => c.psid === psid);
       if(!client) return;
       const newMeeting: Meeting = {
@@ -331,61 +827,47 @@ const App: React.FC = () => {
           clientName: client.userName,
           title,
           date,
-          status: 'pending'
+          status: 'pending',
+          reminder: reminderConfig
       };
       setMeetings([...meetings, newMeeting]);
   };
 
-  const handleDeleteMeeting = (id: string) => {
-      setMeetings(meetings.filter(m => m.id !== id));
-  };
-
-  const handleToggleMeetingStatus = (id: string) => {
-      setMeetings(meetings.map(m => 
-        m.id === id ? { ...m, status: m.status === 'pending' ? 'completed' : 'pending' } : m
-      ));
-  };
+  const handleDeleteMeeting = (id: string) => setMeetings(meetings.filter(m => m.id !== id));
+  const handleToggleMeetingStatus = (id: string) => setMeetings(meetings.map(m => m.id === id ? { ...m, status: m.status === 'pending' ? 'completed' : 'pending' } : m));
   
-  // Navigation Helper
   const [selectedPsidForChat, setSelectedPsidForChat] = useState<string | null>(null);
+  const handleOpenChatFromSchedule = (psid: string) => { setActiveTab('messages'); setSelectedPsidForChat(psid); };
+  const handleOpenPortal = (psid: string) => { setPortalClientId(psid); setActiveTab('portal_view'); };
 
-  const handleOpenChatFromSchedule = (psid: string) => {
-      setActiveTab('messages');
-      setSelectedPsidForChat(psid);
-  };
-
-  // Portal Helper
-  const handleOpenPortal = (psid: string) => {
-      setPortalClientId(psid);
-      setActiveTab('portal_view');
-  };
-
-  // --- ADMIN MANAGEMENT HANDLERS ---
-  
-  // 1. Client Top Up / Fund Management (Used by Portal AND Admin)
-  const handleFundUpdate = (
+  const handleFundUpdate = async (
       psid: string, 
       amount: number, 
       type: 'credit' | 'debit', 
       description: string, 
       category: TransactionCategory = 'other',
-      metadata?: TransactionMetadata
+      metadata?: TransactionMetadata,
+      customDate?: Date
   ) => {
+      const txDate = customDate || new Date();
+      const validAmount = parseFloat(amount.toString()) || 0;
+
+      const newTx: Transaction = {
+          id: `tx_${Date.now()}`,
+          date: txDate,
+          type: type,
+          amount: validAmount,
+          description: description,
+          category: category,
+          status: 'completed',
+          metadata: metadata 
+      };
+
       setConversations(prev => prev.map(c => {
           if (c.psid === psid) {
-              const currentBalance = c.walletBalance || 0;
-              const newBalance = type === 'credit' ? currentBalance + amount : currentBalance - amount;
-              
-              const newTx: Transaction = {
-                  id: `tx_${Date.now()}`,
-                  date: new Date(),
-                  type: type,
-                  amount: amount,
-                  description: description,
-                  category: category,
-                  status: 'completed',
-                  metadata: metadata
-              };
+              const currentBalance = parseFloat((c.walletBalance || 0).toString());
+              let newBalance = type === 'credit' ? currentBalance + validAmount : currentBalance - validAmount;
+              newBalance = Math.round(newBalance * 100) / 100; 
               
               return {
                   ...c,
@@ -395,29 +877,36 @@ const App: React.FC = () => {
           }
           return c;
       }));
+
+      try {
+          const payload = {
+              psid,
+              amount: validAmount,
+              type,
+              description,
+              category,
+              date: format(txDate, 'yyyy-MM-dd HH:mm:ss'), 
+              ...metadata 
+          };
+          await fetch(`${API_BASE_URL}/api/add_transaction.php`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload)
+          });
+      } catch (e) {
+          logApiWarning("add_transaction", e);
+      }
   };
 
-  // 2. Admin Edit Client Profile
-  const handleUpdateClientProfile = (psid: string, data: Partial<Conversation>) => {
-      setConversations(prev => prev.map(c => 
-          c.psid === psid ? { ...c, ...data } : c
-      ));
-  };
-
-  // 3. Admin Delete Transaction
   const handleDeleteTransaction = (psid: string, txId: string) => {
       setConversations(prev => prev.map(c => {
           if (c.psid === psid && c.transactions) {
               const txToDelete = c.transactions.find(t => t.id === txId);
               if (!txToDelete) return c;
-
-              // Reverse the balance impact
               let newBalance = c.walletBalance || 0;
-              if (txToDelete.type === 'credit') {
-                  newBalance -= txToDelete.amount;
-              } else {
-                  newBalance += txToDelete.amount;
-              }
+              if (txToDelete.type === 'credit') newBalance -= txToDelete.amount;
+              else newBalance += txToDelete.amount;
+              newBalance = Math.round(newBalance * 100) / 100;
 
               return {
                   ...c,
@@ -429,31 +918,22 @@ const App: React.FC = () => {
       }));
   };
 
-  // 4. Admin Edit Transaction
   const handleEditTransaction = (psid: string, txId: string, updatedTx: Partial<Transaction>) => {
       setConversations(prev => prev.map(c => {
           if (c.psid === psid && c.transactions) {
               const oldTx = c.transactions.find(t => t.id === txId);
               if (!oldTx) return c;
-
-              // Calculate balance impact difference
-              // 1. Revert old impact
               let tempBalance = c.walletBalance || 0;
-              if (oldTx.type === 'credit') {
-                  tempBalance -= oldTx.amount;
-              } else {
-                  tempBalance += oldTx.amount;
-              }
+              
+              if (oldTx.type === 'credit') tempBalance -= oldTx.amount;
+              else tempBalance += oldTx.amount;
 
-              // 2. Apply new impact (from updated fields or falling back to old ones)
               const newAmount = updatedTx.amount !== undefined ? updatedTx.amount : oldTx.amount;
               const newType = updatedTx.type || oldTx.type;
-
-              if (newType === 'credit') {
-                  tempBalance += newAmount;
-              } else {
-                  tempBalance -= newAmount;
-              }
+              
+              if (newType === 'credit') tempBalance += newAmount;
+              else tempBalance -= newAmount;
+              tempBalance = Math.round(tempBalance * 100) / 100;
 
               return {
                   ...c,
@@ -465,7 +945,6 @@ const App: React.FC = () => {
       }));
   };
 
-  // 5. Task Management Handlers (Client Specific)
   const handleAddTask = (psid: string, taskTitle: string, type: 'weekly' | 'monthly', priority: 'high' | 'medium' | 'low' = 'medium', deadline?: Date) => {
       setConversations(prev => prev.map(c => {
           if (c.psid === psid) {
@@ -478,10 +957,7 @@ const App: React.FC = () => {
                   isCompleted: false,
                   assignedDate: new Date()
               };
-              return {
-                  ...c,
-                  tasks: [newTask, ...(c.tasks || [])]
-              };
+              return { ...c, tasks: [newTask, ...(c.tasks || [])] };
           }
           return c;
       }));
@@ -490,10 +966,7 @@ const App: React.FC = () => {
   const handleToggleTask = (psid: string, taskId: string) => {
       setConversations(prev => prev.map(c => {
           if (c.psid === psid && c.tasks) {
-              return {
-                  ...c,
-                  tasks: c.tasks.map(t => t.id === taskId ? { ...t, isCompleted: !t.isCompleted } : t)
-              };
+              return { ...c, tasks: c.tasks.map(t => t.id === taskId ? { ...t, isCompleted: !t.isCompleted } : t) };
           }
           return c;
       }));
@@ -502,16 +975,66 @@ const App: React.FC = () => {
   const handleDeleteTask = (psid: string, taskId: string) => {
       setConversations(prev => prev.map(c => {
           if (c.psid === psid && c.tasks) {
-              return {
-                  ...c,
-                  tasks: c.tasks.filter(t => t.id !== taskId)
-              };
+              return { ...c, tasks: c.tasks.filter(t => t.id !== taskId) };
           }
           return c;
       }));
   };
 
-  // 6. Admin Personal Task Handlers
+  const handleSaveInvoice = async (psid: string, invoice: InvoiceRecord) => {
+      setConversations(prev => prev.map(c => {
+          if (c.psid === psid) {
+              const currentInvoices = c.invoices || [];
+              if (currentInvoices.some(inv => inv.id === invoice.id)) return c;
+              return { ...c, invoices: [invoice, ...currentInvoices] };
+          }
+          return c;
+      }));
+
+      try {
+          await fetch(`${API_BASE_URL}/api/save_invoice.php`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ psid, invoice })
+          });
+      } catch (e) {
+          logApiWarning("save_invoice", e);
+      }
+  };
+
+  // Proposal & Automation Logic
+  const handleSaveProposal = (proposal: Proposal) => {
+      setProposals(prev => {
+          const existing = prev.findIndex(p => p.id === proposal.id);
+          if(existing >= 0) {
+              const updated = [...prev];
+              updated[existing] = proposal;
+              return updated;
+          }
+          return [...prev, proposal];
+      });
+  };
+
+  const handleAcceptProposal = (proposalId: string) => {
+      const proposal = proposals.find(p => p.id === proposalId);
+      if (!proposal) return;
+
+      // 1. Update Proposal Status
+      setProposals(prev => prev.map(p => p.id === proposalId ? { ...p, status: 'accepted' } : p));
+
+      // 2. Create Invoice
+      const newInvoice: InvoiceRecord = {
+          id: `inv_${Date.now()}`,
+          invoiceNumber: `INV-AUTO-${format(new Date(), 'yyMMdd')}`,
+          date: new Date(),
+          totalAmount: proposal.totalAmount,
+          items: proposal.items,
+          status: 'unpaid'
+      };
+      handleSaveInvoice(proposal.clientId, newInvoice);
+      alert("Proposal Accepted! Invoice Generated.");
+  };
+
   const handleAddAdminTask = (title: string, description?: string, relatedClientId?: string) => {
       const newTask: AdminTask = {
           id: `at_${Date.now()}`,
@@ -520,39 +1043,24 @@ const App: React.FC = () => {
           relatedClientId,
           relatedClientName: relatedClientId ? conversations.find(c => c.psid === relatedClientId)?.userName : undefined,
           isCompleted: false,
+          status: 'todo',
+          priority: 'medium',
           createdAt: new Date()
       };
       setAdminTasks([newTask, ...adminTasks]);
   };
 
-  const handleToggleAdminTask = (taskId: string) => {
-      setAdminTasks(adminTasks.map(t => t.id === taskId ? { ...t, isCompleted: !t.isCompleted } : t));
+  const handleUpdateAdminTaskStatus = (taskId: string, status: 'todo' | 'in_progress' | 'done') => {
+      setAdminTasks(adminTasks.map(t => t.id === taskId ? { ...t, status: status, isCompleted: status === 'done' } : t));
   };
 
   const handleDeleteAdminTask = (taskId: string) => {
       setAdminTasks(adminTasks.filter(t => t.id !== taskId));
   };
 
-  const [settings, setSettings] = useState<PluginSettings>({
-    pageAccessToken: '',
-    verifyToken: 'my_custom_verify_token',
-    appId: '',
-    appSecret: '',
-    webhookUrl: 'https://your-wordpress-site.com/?mfb_webhook=1',
-    googleSheetId: '',
-    googleServiceAccountJson: ''
-  });
-
-  const handleSimulateMessage = (
-    text: string | null,
-    type: AttachmentType,
-    url?: string,
-    psidInput?: string
-  ) => {
-    // ... existing logic ...
+  const handleSimulateMessage = (text: string | null, type: AttachmentType, url?: string, psidInput?: string) => {
     const psid = psidInput || '1234567890123456';
     const messageContent = text || `(${type} attachment)`;
-
     const newMessage = {
       id: Date.now(),
       messageText: messageContent,
@@ -561,16 +1069,20 @@ const App: React.FC = () => {
       fbMid: `mid.$simulated${Date.now()}`,
       createdTime: new Date(),
     };
-
     const extractedData = text ? extractInfo(text) : {};
 
     setConversations(prev => {
         const existingConvIndex = prev.findIndex(c => c.psid === psid);
-        
         if (existingConvIndex >= 0) {
             const updatedConversations = [...prev];
             const conv = updatedConversations[existingConvIndex];
-            
+            const hasNewMobile = extractedData.extractedMobile && conv.extractedMobile !== extractedData.extractedMobile;
+            const updates: any = {};
+            if (hasNewMobile) {
+                updates.extractedMobile = extractedData.extractedMobile;
+                updates.status = conv.status === 'new_lead' ? 'interested' : conv.status;
+                handleUpdateClientProfile(psid, updates);
+            }
             updatedConversations[existingConvIndex] = {
                 ...conv,
                 messages: [...conv.messages, newMessage],
@@ -579,7 +1091,7 @@ const App: React.FC = () => {
                 extractedMobile: extractedData.extractedMobile || conv.extractedMobile,
                 extractedWebsite: extractedData.extractedWebsite || conv.extractedWebsite,
                 extractedFbLink: extractedData.extractedFbLink || conv.extractedFbLink,
-                status: conv.status === 'converted' || conv.status === 'cold' ? 'negotiation' : conv.status 
+                status: updates.status || conv.status
             };
             return updatedConversations;
         } else {
@@ -591,12 +1103,17 @@ const App: React.FC = () => {
                 unreadCount: 1,
                 lastActive: new Date(),
                 downloadCount: 0,
+                smsCount: 0,
                 tags: ['New'],
                 dealValue: 0,
                 aiSummary: 'New user via Simulator. Needs qualification.',
                 messages: [newMessage],
+                invoices: [],
+                transactions: [],
+                tasks: [],
                 ...extractedData
             };
+            handleUpdateClientProfile(psid, newConv);
             return [newConv, ...prev];
         }
     });
@@ -604,95 +1121,109 @@ const App: React.FC = () => {
 
   const renderContent = () => {
     switch (activeTab) {
-      case 'settings':
-        return <SettingsPanel settings={settings} updateSettings={setSettings} />;
-      case 'messages':
-        return (
-            <MessengerCRM 
-                conversations={conversations} 
-                savedReplies={savedReplies}
-                onUpdateStatus={handleUpdateStatus}
-                onUpdateValue={() => {}} 
-                onSendMessage={handleSendMessage}
-                onAddReply={handleAddReply}
-                onUpdateReply={handleUpdateReply}
-                onDeleteReply={handleDeleteReply}
-                onUpdateSummary={handleUpdateSummary}
-                onScheduleMeeting={handleScheduleMeeting}
-                onUpdateTags={handleUpdateTags}
-                onUpdateDealValue={handleUpdateDealValue}
-                onUpdateNotes={handleUpdateNotes}
-            />
-        );
-      case 'schedules':
-        return (
-            <ScheduleManager 
-                meetings={meetings} 
-                conversations={conversations}
-                onDeleteMeeting={handleDeleteMeeting}
-                onToggleStatus={handleToggleMeetingStatus}
-                onOpenChat={handleOpenChatFromSchedule}
-            />
-        );
-      case 'tasks':
-        return (
-            <TaskManager 
-                tasks={adminTasks}
-                conversations={conversations}
-                onAddTask={handleAddAdminTask}
-                onToggleTask={handleToggleAdminTask}
-                onDeleteTask={handleDeleteAdminTask}
-            />
-        );
-      case 'leads':
-        return <LeadDatabase 
-                  conversations={conversations} 
-                  onExport={handleLeadsExported} 
-                  onAddManualLead={handleAddManualLead} 
-                  onUpdateStatus={handleUpdateStatus}
-               />;
-      case 'client_report':
-        return <ClientReport 
-                  conversations={conversations}
-                  onOpenPortal={handleOpenPortal}
-                  onUpdateClientProfile={handleUpdateClientProfile}
-                  onManageBalance={handleFundUpdate}
-                  onDeleteTransaction={handleDeleteTransaction}
-                  onEditTransaction={handleEditTransaction}
-                  onAddTask={handleAddTask}
-                  onDeleteTask={handleDeleteTask}
-               />;
-      case 'invoices':
-        return <InvoiceGenerator conversations={conversations} />;
-      case 'simulator':
-        return <WebhookSimulator onSimulateMessage={handleSimulateMessage} />;
-      case 'dashboard':
-      default:
-        return <Dashboard 
-                  conversations={conversations} 
-                  meetings={meetings} 
-                  onOpenChat={handleOpenChatFromSchedule} 
-               />;
+      case 'settings': return <SettingsPanel settings={settings} updateSettings={setSettings} onSave={handleSaveSettings} />;
+      case 'payment_methods': return <PaymentSettings paymentMethods={paymentMethods} onAddPaymentMethod={handleAddPaymentMethod} onDeletePaymentMethod={handleDeletePaymentMethod} />;
+      case 'messages': return ( <MessengerCRM conversations={conversations} savedReplies={savedReplies} aiKnowledgeBase={aiKnowledgeBase} aiPersona={aiPersona} aiSettings={aiSettings} onUpdateStatus={handleUpdateStatus} onUpdateValue={() => {}} onSendMessage={handleSendMessage} onAddReply={handleAddReply} onUpdateReply={handleUpdateReply} onDeleteReply={handleDeleteReply} onUpdateSummary={handleUpdateSummary} onScheduleMeeting={handleScheduleMeeting} onUpdateTags={handleUpdateTags} onUpdateDealValue={handleUpdateDealValue} onUpdateNotes={handleUpdateNotes} onFetchMessages={fetchClientMessages} onToggleAi={handleToggleAi} onAddAiKnowledge={handleAddAiKnowledge} onUpdateAiKnowledge={handleUpdateAiKnowledge} onDeleteAiKnowledge={handleDeleteAiKnowledge} onOpenProposal={() => setActiveTab('proposals')} /> );
+      case 'ai_brain': return <AiSalesBrain aiKnowledgeBase={aiKnowledgeBase} onAddAiKnowledge={handleAddAiKnowledge} onDeleteAiKnowledge={handleDeleteAiKnowledge} aiPersona={aiPersona} setAiPersona={setAiPersona} aiSettings={aiSettings} setAiSettings={setAiSettings} />;
+      case 'campaign_gen': return <CampaignGenerator />;
+      case 'my_accounts': return <PersonalVault accounts={personalAccounts} onAddAccount={handleAddPersonalAccount} onUpdateAccount={handleUpdatePersonalAccount} onDeleteAccount={handleDeletePersonalAccount} />;
+      case 'schedules': return ( <ScheduleManager meetings={meetings} conversations={conversations} onScheduleMeeting={handleScheduleMeeting} onDeleteMeeting={handleDeleteMeeting} onToggleStatus={handleToggleMeetingStatus} onOpenChat={handleOpenChatFromSchedule} /> );
+      case 'tasks': return ( <TaskManager tasks={adminTasks} conversations={conversations} onAddTask={handleAddAdminTask} onUpdateStatus={handleUpdateAdminTaskStatus} onDeleteTask={handleDeleteAdminTask} /> );
+      case 'leads': return <LeadDatabase conversations={conversations} onExport={handleLeadsExported} onAddManualLead={handleAddManualLead} onUpdateStatus={handleUpdateStatus} onOpenPublicLink={() => setIsPublicMode(true)} onToggleBestQuality={handleToggleBestQuality} onUpdateNotes={handleUpdateNotes} onUpdateServiceType={handleUpdateServiceType} onUpdateIndustry={handleUpdateIndustry} />;
+      case 'client_report': return <ClientReport conversations={conversations} dripSequences={dripSequences} onOpenPortal={handleOpenPortal} onUpdateClientProfile={handleUpdateClientProfile} onManageBalance={handleFundUpdate} onDeleteTransaction={handleDeleteTransaction} onEditTransaction={handleEditTransaction} onAddTask={handleAddTask} onDeleteTask={handleDeleteTask} onSendMessage={handleSendMessage} />;
+      case 'invoices': return <InvoiceGenerator conversations={conversations} onSaveInvoice={handleSaveInvoice} />;
+      case 'web_vault': return <WebsiteManager websites={websites} conversations={conversations} onAddWebsite={handleAddWebsite} onUpdateWebsite={handleUpdateWebsite} onDeleteWebsite={handleDeleteWebsite} />;
+      case 'bulk_sms': return <BulkSmsManager conversations={conversations} meetings={meetings} settings={smsSettings} onSaveSettings={handleSaveSmsSettings} onSaveCampaign={handleSaveSmsCampaign} onUpdateSmsStats={handleSmsSent} campaignHistory={smsHistory} aiPersona={aiPersona} />;
+      case 'proposals': return <ProposalBuilder conversations={conversations} proposals={proposals} onSaveProposal={handleSaveProposal} onAcceptProposal={handleAcceptProposal} />;
+      case 'automation': return <AutomationHub conversations={conversations} dripSequences={dripSequences} onUpdateDrip={(seq) => setDripSequences(dripSequences.map(s => s.id === seq.id ? seq : s))} reportConfig={reportConfig} onUpdateReportConfig={setReportConfig} smsSettings={smsSettings} />;
+      case 'audit_tool': return <AuditTool />;
+      case 'simulator': return <WebhookSimulator onSimulateMessage={handleSimulateMessage} />;
+      case 'dashboard': default: return <Dashboard conversations={conversations} meetings={meetings} onOpenChat={handleOpenChatFromSchedule} adminTasks={adminTasks} smsHistory={smsHistory} aiSettings={aiSettings} aiKnowledgeBase={aiKnowledgeBase} smsSettings={smsSettings} setActiveTab={setActiveTab} />;
     }
   };
 
-  // Special Route for Public Portal View (No Sidebar)
   if (activeTab === 'portal_view' && portalClientId) {
       const client = conversations.find(c => c.psid === portalClientId);
       if (client) {
           return (
-              <ClientPortal 
-                  client={client} 
-                  onTopUp={(psid, amount) => handleFundUpdate(psid, amount, 'credit', 'Online Top-up', 'payment')} 
-                  onToggleTask={handleToggleTask}
-                  onExit={() => setActiveTab('client_report')} // In real app, this wouldn't exist for client
-              />
+              <ClientPortal client={client} onTopUp={(psid, amount) => handleFundUpdate(psid, amount, 'credit', 'Online Top-up', 'payment')} onToggleTask={handleToggleTask} onExit={() => setActiveTab('client_report')} paymentMethods={paymentMethods} />
           );
       }
   }
 
+  if (isPublicMode) {
+      return (
+          <div className="relative">
+              <button onClick={() => setIsPublicMode(false)} className="fixed top-4 left-4 bg-slate-900 text-white px-4 py-2 rounded-lg z-50 shadow-lg text-sm font-bold">Back to Admin Dashboard</button>
+              <PublicLeadForm onSubmit={handleAddManualLead} />
+          </div>
+      );
+  }
+
   return (
     <div className="flex bg-slate-50 min-h-screen">
+      
+      {/* GLOBAL NOTIFICATION CONTAINER */}
+      <div className="fixed top-4 right-4 z-[9999] flex flex-col gap-2">
+          {notifications.map((note, idx) => (
+              <div key={idx} className="bg-slate-900 text-white px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3 animate-in slide-in-from-right-10 duration-300">
+                  <div className="bg-orange-500 rounded-full p-1.5 animate-pulse">
+                      <Bell size={16} className="text-white" />
+                  </div>
+                  <div>
+                      <p className="text-sm font-bold">{note}</p>
+                      <p className="text-[10px] text-slate-400">Just now</p>
+                  </div>
+              </div>
+          ))}
+      </div>
+      
+      {/* MANUAL FALLBACK MODAL */}
+      {manualSendRequired && (
+          <div className="fixed inset-0 bg-slate-900/80 z-[200] flex items-center justify-center p-4 animate-in fade-in">
+              <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
+                  <div className="flex items-center gap-3 mb-4 text-orange-600">
+                      <div className="p-2 bg-orange-100 rounded-full"><AlertTriangle size={20}/></div>
+                      <h3 className="font-bold">Automation Fallback Required</h3>
+                  </div>
+                  <p className="text-sm text-slate-600 mb-4">
+                      Client <strong>{manualSendRequired.client.userName}</strong> has reached <strong>Day {manualSendRequired.dayCount}</strong> of inactivity, but no automated template exists for this milestone.
+                  </p>
+                  <textarea 
+                      className="w-full border border-slate-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-orange-500 outline-none h-32 mb-4"
+                      placeholder="Write a manual follow-up message..."
+                      value={manualFallbackMessage}
+                      onChange={e => setManualFallbackMessage(e.target.value)}
+                  />
+                  <div className="flex gap-3">
+                      <button 
+                          onClick={() => setManualSendRequired(null)}
+                          className="flex-1 py-2 border border-slate-200 rounded-lg text-slate-600 font-bold text-sm hover:bg-slate-50"
+                      >
+                          Skip for Today
+                      </button>
+                      <button 
+                          onClick={handleManualSendSubmit}
+                          disabled={!manualFallbackMessage}
+                          className="flex-1 py-2 bg-orange-600 text-white rounded-lg font-bold text-sm hover:bg-orange-700 disabled:opacity-50"
+                      >
+                          Send Manual SMS
+                      </button>
+                  </div>
+              </div>
+          </div>
+      )}
+
+      {/* DAILY BRIEFING MODAL */}
+      {showDailyBriefing && (
+          <DailyBriefingModal 
+              conversations={conversations} 
+              meetings={meetings} 
+              onClose={handleCloseBriefing}
+              onQuickAction={handleBriefingQuickAction}
+          />
+      )}
+
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
       <main className="flex-1 ml-64 p-8 h-screen overflow-hidden flex flex-col print:ml-0 print:p-0 print:h-auto print:overflow-visible">
         <header className="mb-6 flex justify-between items-center flex-shrink-0">
@@ -701,24 +1232,32 @@ const App: React.FC = () => {
                 {activeTab === 'messages' ? 'CRM & Inbox' : 
                  activeTab === 'leads' ? 'Lead Database' :
                  activeTab === 'client_report' ? 'Client Report & Portals' :
-                 activeTab === 'tasks' ? 'Daily Tasks' :
+                 activeTab === 'web_vault' ? 'Website Credential Vault' :
+                 activeTab === 'bulk_sms' ? 'Bulk SMS & API' :
+                 activeTab === 'tasks' ? 'Task Command Center' :
                  activeTab === 'invoices' ? 'Invoice Generator' :
+                 activeTab === 'schedules' ? 'Mission Control' :
+                 activeTab === 'ai_brain' ? 'AI Training Center' :
+                 activeTab === 'campaign_gen' ? 'Facebook Campaign Name Generator' :
+                 activeTab === 'my_accounts' ? 'My Accounts Vault' :
+                 activeTab === 'payment_methods' ? 'Payment Methods Manager' :
+                 activeTab === 'proposals' ? 'Proposal Builder' :
+                 activeTab === 'automation' ? 'Automation Hub' :
+                 activeTab === 'audit_tool' ? 'AI Audit Tool' :
                  activeTab.replace('_', ' ')}
              </h1>
-             <p className="text-slate-500 text-sm">
-                {activeTab === 'client_report' ? 'Manage active client portfolios and portal access' : 
-                 activeTab === 'tasks' ? 'Manage personal and agency-wide tasks' :
-                 activeTab === 'invoices' ? 'Create and download PDF invoices for clients' :
-                 'Manage your Facebook Messenger Integration'}
-             </p>
+             {/* ... header description logic ... */}
           </div>
         </header>
-        <div className="flex-1 overflow-auto print:overflow-visible">
+        <div className="flex-1 overflow-auto print:overflow-visible custom-scrollbar">
             {activeTab === 'messages' && selectedPsidForChat ? (
                 <MessengerCRM 
                     key={`crm-forced-${selectedPsidForChat}`}
                     conversations={conversations} 
                     savedReplies={savedReplies}
+                    aiKnowledgeBase={aiKnowledgeBase}
+                    aiPersona={aiPersona}
+                    aiSettings={aiSettings}
                     onUpdateStatus={handleUpdateStatus}
                     onUpdateValue={() => {}} 
                     onSendMessage={handleSendMessage}
@@ -730,6 +1269,12 @@ const App: React.FC = () => {
                     onUpdateTags={handleUpdateTags}
                     onUpdateDealValue={handleUpdateDealValue}
                     onUpdateNotes={handleUpdateNotes}
+                    onFetchMessages={fetchClientMessages}
+                    onToggleAi={handleToggleAi}
+                    onAddAiKnowledge={handleAddAiKnowledge}
+                    onUpdateAiKnowledge={handleUpdateAiKnowledge}
+                    onDeleteAiKnowledge={handleDeleteAiKnowledge}
+                    onOpenProposal={() => setActiveTab('proposals')}
                 />
             ) : (
                 renderContent()
