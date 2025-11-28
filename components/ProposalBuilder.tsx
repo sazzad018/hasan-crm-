@@ -122,7 +122,8 @@ const ProposalBuilder: React.FC<ProposalBuilderProps> = ({ conversations, propos
 
     const copyLink = () => {
         if(selectedProposal) {
-            const link = `https://portal.socialadsexpert.com/proposal/${selectedProposal.id}`;
+            const baseUrl = window.location.origin;
+            const link = `${baseUrl}/proposal/${selectedProposal.id}`;
             navigator.clipboard.writeText(link);
             alert("Client View Link Copied! Send this to your client.");
             setShowShareModal(false);
@@ -399,7 +400,7 @@ const ProposalBuilder: React.FC<ProposalBuilderProps> = ({ conversations, propos
                             <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
                                 <p className="text-xs text-slate-500 mb-1 uppercase font-bold">Magic Link</p>
                                 <code className="block w-full font-mono text-xs text-slate-700 truncate">
-                                    https://portal.socialadsexpert.com/proposal/{selectedProposal.id}
+                                    {`${window.location.origin}/proposal/${selectedProposal.id}`}
                                 </code>
                             </div>
                         </div>

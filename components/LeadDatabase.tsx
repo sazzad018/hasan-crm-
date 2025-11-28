@@ -50,7 +50,7 @@ const LeadDatabase: React.FC<LeadDatabaseProps> = ({ conversations, onExport, on
   });
 
   // Public Link Logic
-  const publicLink = "https://portal.socialadsexpert.com/form/lead-gen";
+  const publicLink = `${window.location.origin}/form/lead-gen`;
   const [showLinkModal, setShowLinkModal] = useState(false);
 
   const copyPublicLink = () => {
@@ -624,7 +624,7 @@ const LeadDatabase: React.FC<LeadDatabaseProps> = ({ conversations, onExport, on
                           
                           {/* Select */}
                           <div className="col-span-1 flex justify-center">
-                              <button onClick={() => handleSelectOne(lead.psid)} className={isSelected ? 'text-blue-600' : 'text-slate-300 hover:text-slate-500'}>
+                              <button onClick={() => handleSelectOne(lead.psid)} className={isSelected ? 'text-blue-600' : 'text-slate-300 hover:text-slate-50'}>
                                   {isSelected ? <CheckSquare size={18} /> : <Square size={18} />}
                               </button>
                           </div>

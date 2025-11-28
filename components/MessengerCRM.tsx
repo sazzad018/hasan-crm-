@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Conversation, FbMessage, AttachmentType, LeadStatus, SavedReply, AiKnowledgeItem, AiSettings } from '../types';
 import { 
@@ -896,7 +897,7 @@ const MessengerCRM: React.FC<MessengerCRMProps> = ({
                         onClick={() => {
                             alert("Sending Audit Report Link...");
                             // In real app, generate link and send
-                            onSendMessage(selectedConversation.psid, "Here is your Website Audit Report: https://portal.agency.com/audit/" + selectedConversation.psid);
+                            onSendMessage(selectedConversation.psid, `Here is your Website Audit Report: ${window.location.origin}/audit/${selectedConversation.psid}`);
                         }}
                         className="flex flex-col items-center justify-center p-2 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 transition-colors border border-emerald-100"
                      >
