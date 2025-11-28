@@ -558,9 +558,21 @@ CRITICAL INSTRUCTIONS:
               if (response.ok) {
                   const contentType = response.headers.get("content-type");
                   if (contentType && contentType.includes("application/json")) {
-                      const resJson = await response.json();
-                      if(resJson.status === 'success') successCount++;
-                      else failCount++;
+                      const text = await response.text();
+                      if (text) {
+                          try {
+                              const resJson = JSON.parse(text);
+                              if(resJson.status === 'success') successCount++;
+                              else failCount++;
+                          } catch(e) {
+                              // If response is not valid JSON, treat as fail or success depending on strictness
+                              // Assuming success for simple PHP scripts if 200 OK
+                              successCount++;
+                          }
+                      } else {
+                          // Empty body but 200 OK
+                          successCount++;
+                      }
                   } else {
                       // Assume success if 200 OK but not JSON (rare edge case for simple PHP scripts)
                       successCount++; 
