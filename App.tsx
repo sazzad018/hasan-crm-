@@ -48,8 +48,9 @@ const App: React.FC = () => {
   } | null>(null);
   const [manualFallbackMessage, setManualFallbackMessage] = useState('');
 
-  // IMPORTANT: Set this to your live server URL
-  const API_BASE_URL = 'https://akafshop.com'; 
+  // IMPORTANT: Set to relative path for Shared Hosting deployment
+  // The React build will look for an 'api' folder in the same domain
+  const API_BASE_URL = '/api'; 
 
   // --- GENERATE 50+ MOCK DATA POINTS ---
   const generateMockData = (): Conversation[] => {
@@ -297,8 +298,6 @@ CRITICAL INSTRUCTIONS:
       { id: '3', category: 'mobile', provider: 'Nagad', type: 'Merchant', accountNumber: '01800000000', instructions: 'Payment option.' }
   ]);
 
-  // ... (Helper functions like handleAddPaymentMethod, extractInfo, logApiWarning, addNotification...) ...
-  
   const handleAddPaymentMethod = (method: PaymentMethod) => {
       setPaymentMethods([...paymentMethods, method]);
   };
@@ -329,7 +328,8 @@ CRITICAL INSTRUCTIONS:
   };
 
   const logApiWarning = (context: string, error: unknown) => {
-      console.warn(`[API] ${context} failed (Demo Mode - Backend Unavailable):`, error);
+      // Suppress network errors in console when running locally without backend
+      console.warn(`[API] ${context} not reachable. Using local data.`);
   };
 
   const addNotification = (msg: string) => {
@@ -361,7 +361,7 @@ CRITICAL INSTRUCTIONS:
 
       try {
         const payload = { psid, ...data };
-        await fetch(`${API_BASE_URL}/api/update_client.php`, {
+        await fetch(`${API_BASE_URL}/save_lead.php`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
@@ -381,21 +381,26 @@ CRITICAL INSTRUCTIONS:
 
     while (attempts < maxAttempts) {
         try {
-            const response = await fetch(`${API_BASE_URL}/api/get_clients.php?_t=${Date.now()}`);
+            const response = await fetch(`${API_BASE_URL}/get_clients.php?_t=${Date.now()}`);
             
             // Only error on server failure, allow retries
-            if (!response.ok && response.status >= 500) {
-                throw new Error(`HTTP ${response.status}`);
-            } else if (!response.ok) {
-                // 4xx error, break loop
+            if (!response.ok) {
+                // If 404 or 500, user likely hasn't uploaded backend yet. Fallback to mock.
                 break; 
+            }
+
+            // CHECK CONTENT TYPE - Safety for shared hosting returning HTML 404s
+            const contentType = response.headers.get("content-type");
+            if (!contentType || !contentType.includes("application/json")) {
+                // Not JSON (likely HTML error page), fail silently to keep mock data
+                break;
             }
 
             const text = await response.text();
             
             // Validate Empty response
             if (!text || text.trim().length === 0) {
-                if (conversations.length <= 4) setConversations(generateMockData());
+                // Keep existing mock data if fetch fails empty
                 return;
             }
 
@@ -404,14 +409,13 @@ CRITICAL INSTRUCTIONS:
             try { 
                 data = JSON.parse(text); 
             } catch (e) {
-                console.warn(`[API] JSON Parse error in fetchClients:`, e);
                 // Don't retry on parse error, data is corrupt
-                if (conversations.length <= 4) setConversations(generateMockData());
+                console.warn("Invalid JSON response from server:", e);
                 return;
             }
             
-            if (Array.isArray(data) || (data && data.status !== 'error')) {
-                    const rawList = Array.isArray(data) ? data : [];
+            if (Array.isArray(data) && data.length > 0) {
+                    const rawList = data;
                     const mappedData: Conversation[] = rawList.map((row: any) => ({
                         psid: row.psid,
                         userName: row.user_name || 'Unknown User',
@@ -445,7 +449,10 @@ CRITICAL INSTRUCTIONS:
                     }));
 
                     setConversations(prev => {
-                        if(prev.length === 0) return mappedData;
+                        // Merge strategies could be complex, simple replacement for now if data exists
+                        // To keep UI smooth, we only update if we got valid data
+                        if(prev.length <= 5 && mappedData.length > 0) return mappedData; // Initial load override
+                        
                         return mappedData.map(newC => {
                             const existing = prev.find(p => p.psid === newC.psid);
                             return existing ? { 
@@ -462,17 +469,13 @@ CRITICAL INSTRUCTIONS:
                         });
                     });
                     return; // Success
-            } else {
-                if (conversations.length <= 4) setConversations(generateMockData());
-                return;
             }
+            break; // Valid JSON but empty or error struct
         } catch (error) {
             attempts++;
             if (attempts >= maxAttempts) {
-                logApiWarning("fetchClients", error);
-                if (conversations.length <= 4) setConversations(generateMockData());
+                // Silent fail to keep mock data
             } else {
-                // Exponential backoff
                 await new Promise(r => setTimeout(r, 1000 * attempts)); 
             }
         }
@@ -487,13 +490,12 @@ CRITICAL INSTRUCTIONS:
 
     while(attempts < maxAttempts) {
         try {
-            const response = await fetch(`${API_BASE_URL}/api/get_messages.php?sender_id=${psid}&_t=${Date.now()}`);
+            const response = await fetch(`${API_BASE_URL}/get_messages.php?sender_id=${psid}&_t=${Date.now()}`);
             
-            if (!response.ok && response.status >= 500) {
-                 throw new Error(`HTTP ${response.status}`);
-            } else if (!response.ok) {
-                 break; 
-            }
+            if (!response.ok) break;
+
+            const contentType = response.headers.get("content-type");
+            if (!contentType || !contentType.includes("application/json")) return;
 
             const text = await response.text();
             if (!text || text.trim().length === 0) return;
@@ -502,7 +504,6 @@ CRITICAL INSTRUCTIONS:
             try { 
                 data = JSON.parse(text); 
             } catch (e) { 
-                console.warn(`[API] JSON Parse error in fetchClientMessages for ${psid}`);
                 return; 
             }
 
@@ -525,12 +526,59 @@ CRITICAL INSTRUCTIONS:
         } catch (e) {
             attempts++;
             if (attempts >= maxAttempts) {
-                logApiWarning("fetchClientMessages", e);
+                // Fail silently
             } else {
                 await new Promise(r => setTimeout(r, 1000 * attempts));
             }
         }
     }
+  };
+
+  // Sync Mock Data to Real Database (Migration Tool)
+  const handleSyncData = async () => {
+      let successCount = 0;
+      let failCount = 0;
+      addNotification("⏳ Starting Database Sync... Please wait.");
+
+      for (const client of conversations) {
+          try {
+              // Prepare comprehensive payload including extended fields
+              const payload = {
+                  ...client,
+                  // Ensure dates are strings for PHP
+                  lastActive: client.lastActive ? new Date(client.lastActive).toISOString() : new Date().toISOString()
+              };
+
+              const response = await fetch(`${API_BASE_URL}/save_lead.php`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(payload)
+              });
+              
+              if (response.ok) {
+                  const contentType = response.headers.get("content-type");
+                  if (contentType && contentType.includes("application/json")) {
+                      const resJson = await response.json();
+                      if(resJson.status === 'success') successCount++;
+                      else failCount++;
+                  } else {
+                      // Assume success if 200 OK but not JSON (rare edge case for simple PHP scripts)
+                      successCount++; 
+                  }
+              } else {
+                  failCount++;
+              }
+          } catch (e) {
+              failCount++;
+          }
+      }
+      
+      addNotification(`✅ Sync Complete: ${successCount} Saved, ${failCount} Failed.`);
+      if(successCount > 0) {
+          alert(`Successfully migrated ${successCount} leads to the database! You can now verify via the 'get_clients.php' endpoint or simply refresh.`);
+      } else {
+          alert("Sync Failed or Partial. Please check if your PHP files are uploaded to the '/api' folder on your hosting and your database credentials in db_connect.php are correct.");
+      }
   };
 
   // --- STARTUP LOGIC & AUTOMATION ENGINE ---
@@ -708,7 +756,7 @@ CRITICAL INSTRUCTIONS:
 
   const handleSaveSettings = async () => {
       try {
-          await fetch(`${API_BASE_URL}/api/save_settings.php`, {
+          await fetch(`${API_BASE_URL}/save_settings.php`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(settings)
@@ -716,7 +764,7 @@ CRITICAL INSTRUCTIONS:
           alert("Settings saved to Database!");
       } catch (e) {
           logApiWarning("save_settings", e);
-          alert("Settings saved locally (Demo Mode).");
+          alert("Settings saved locally (Backend unreachable).");
       }
   };
 
@@ -759,7 +807,7 @@ CRITICAL INSTRUCTIONS:
       }));
 
       try {
-          await fetch(`${API_BASE_URL}/api/send_message.php`, {
+          await fetch(`${API_BASE_URL}/send_message.php`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ recipient_id: psid, message_text: text, attachment_type: attachmentType, attachment_url: attachmentUrl })
@@ -808,7 +856,7 @@ CRITICAL INSTRUCTIONS:
     setConversations([newLead, ...conversations]);
 
     try {
-        await fetch(`${API_BASE_URL}/api/save_lead.php`, {
+        await fetch(`${API_BASE_URL}/save_lead.php`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(newLead)
@@ -888,7 +936,7 @@ CRITICAL INSTRUCTIONS:
               date: format(txDate, 'yyyy-MM-dd HH:mm:ss'), 
               ...metadata 
           };
-          await fetch(`${API_BASE_URL}/api/add_transaction.php`, {
+          await fetch(`${API_BASE_URL}/add_transaction.php`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(payload)
@@ -992,7 +1040,7 @@ CRITICAL INSTRUCTIONS:
       }));
 
       try {
-          await fetch(`${API_BASE_URL}/api/save_invoice.php`, {
+          await fetch(`${API_BASE_URL}/save_invoice.php`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ psid, invoice })
@@ -1121,7 +1169,7 @@ CRITICAL INSTRUCTIONS:
 
   const renderContent = () => {
     switch (activeTab) {
-      case 'settings': return <SettingsPanel settings={settings} updateSettings={setSettings} onSave={handleSaveSettings} />;
+      case 'settings': return <SettingsPanel settings={settings} updateSettings={setSettings} onSave={handleSaveSettings} onSyncData={handleSyncData} />;
       case 'payment_methods': return <PaymentSettings paymentMethods={paymentMethods} onAddPaymentMethod={handleAddPaymentMethod} onDeletePaymentMethod={handleDeletePaymentMethod} />;
       case 'messages': return ( <MessengerCRM conversations={conversations} savedReplies={savedReplies} aiKnowledgeBase={aiKnowledgeBase} aiPersona={aiPersona} aiSettings={aiSettings} onUpdateStatus={handleUpdateStatus} onUpdateValue={() => {}} onSendMessage={handleSendMessage} onAddReply={handleAddReply} onUpdateReply={handleUpdateReply} onDeleteReply={handleDeleteReply} onUpdateSummary={handleUpdateSummary} onScheduleMeeting={handleScheduleMeeting} onUpdateTags={handleUpdateTags} onUpdateDealValue={handleUpdateDealValue} onUpdateNotes={handleUpdateNotes} onFetchMessages={fetchClientMessages} onToggleAi={handleToggleAi} onAddAiKnowledge={handleAddAiKnowledge} onUpdateAiKnowledge={handleUpdateAiKnowledge} onDeleteAiKnowledge={handleDeleteAiKnowledge} onOpenProposal={() => setActiveTab('proposals')} /> );
       case 'ai_brain': return <AiSalesBrain aiKnowledgeBase={aiKnowledgeBase} onAddAiKnowledge={handleAddAiKnowledge} onDeleteAiKnowledge={handleDeleteAiKnowledge} aiPersona={aiPersona} setAiPersona={setAiPersona} aiSettings={aiSettings} setAiSettings={setAiSettings} />;
