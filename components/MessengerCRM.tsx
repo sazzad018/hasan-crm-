@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect, useRef } from 'react';
-import { Conversation, FbMessage, AttachmentType, LeadStatus, SavedReply, AiKnowledgeItem, AiSettings } from '../types';
+import { Conversation, FbMessage, AttachmentType, LeadStatus, SavedReply, AiKnowledgeItem, AiSettings, ScheduledMessage } from '../types';
 import { 
   Search, Mic, Image, Send, MoreHorizontal, Phone, Video, 
   Tag, CheckCircle, User, Globe, Smartphone,
@@ -33,6 +32,7 @@ interface MessengerCRMProps {
   onUpdateAiKnowledge: (item: AiKnowledgeItem) => void;
   onDeleteAiKnowledge: (id: string) => void;
   onOpenProposal?: () => void;
+  onUpdateScheduledMessages: (psid: string, scheduledMessages: ScheduledMessage[], isPaused: boolean) => void;
 }
 
 const MessengerCRM: React.FC<MessengerCRMProps> = ({ 
@@ -57,7 +57,8 @@ const MessengerCRM: React.FC<MessengerCRMProps> = ({
   onAddAiKnowledge,
   onUpdateAiKnowledge,
   onDeleteAiKnowledge,
-  onOpenProposal
+  onOpenProposal,
+  onUpdateScheduledMessages
 }) => {
   const [selectedPsid, setSelectedPsid] = useState<string | null>(null);
   const [inputText, setInputText] = useState('');

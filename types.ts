@@ -131,6 +131,16 @@ export interface LowBalanceConfig {
     lastAlertSent?: Date;
 }
 
+export interface ScheduledMessage {
+    id: string;
+    text: string;
+    date: Date;
+    type: 'one_time' | 'repeat';
+    repeatIntervalDays?: number;
+    nextRun: Date;
+    status: 'pending' | 'sent' | 'paused' | 'cancelled';
+}
+
 export interface Conversation {
   psid: string;
   userName: string;
@@ -177,6 +187,9 @@ export interface Conversation {
   industry?: 'Clothing' | 'Food' | 'RealEstate' | 'Tech' | 'Health' | 'Education' | 'Other'; 
   
   serviceType?: ServiceType;
+
+  scheduledMessages?: ScheduledMessage[];
+  isAutomationPaused?: boolean;
 }
 
 export interface SavedReply {
