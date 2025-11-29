@@ -4,9 +4,9 @@ import {
   Search, Mic, Image, Send, MoreHorizontal, Phone, Video, 
   Tag, CheckCircle, User, Globe, Smartphone,
   Zap, X, Edit2, Trash2, Calendar, Sparkles, Clock,
-  DollarSign, Hash, Minimize2, Maximize2, Layout, MessageSquare, RefreshCw, Bot, BrainCircuit, Wand2, Power, Plus, Gem, MousePointer2, Copy, FolderOpen, Paperclip, FileText, ScanSearch
+  DollarSign, Hash, Minimize2, Maximize2, Layout, MessageSquare, RefreshCw, Bot, BrainCircuit, Wand2, Power, Plus, Gem, MousePointer2, Copy, FolderOpen, Paperclip, FileText, ScanSearch, PlayCircle, PauseCircle
 } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, addDays } from 'date-fns';
 import { GoogleGenAI } from "@google/genai";
 
 interface MessengerCRMProps {
@@ -14,7 +14,7 @@ interface MessengerCRMProps {
   savedReplies: SavedReply[];
   aiKnowledgeBase: AiKnowledgeItem[];
   aiPersona: string;
-  aiSettings: AiSettings; // Updated Structure
+  aiSettings: AiSettings; 
   onUpdateStatus: (psid: string, status: LeadStatus) => void;
   onUpdateValue: (psid: string, value: number) => void;
   onSendMessage: (psid: string, text: string, attachmentType?: AttachmentType, attachmentUrl?: string) => void;
@@ -32,7 +32,7 @@ interface MessengerCRMProps {
   onUpdateAiKnowledge: (item: AiKnowledgeItem) => void;
   onDeleteAiKnowledge: (id: string) => void;
   onOpenProposal?: () => void;
-  onUpdateScheduledMessages: (psid: string, scheduledMessages: ScheduledMessage[], isPaused: boolean) => void;
+  onUpdateScheduledMessages?: (psid: string, messages: ScheduledMessage[], isPaused: boolean) => void; // NEW
 }
 
 const MessengerCRM: React.FC<MessengerCRMProps> = ({ 
@@ -96,6 +96,14 @@ const MessengerCRM: React.FC<MessengerCRMProps> = ({
   const [scheduleDate, setScheduleDate] = useState('');
   const [scheduleTime, setScheduleTime] = useState('');
 
+  // NEW: Message Scheduler Modal State
+  const [isMsgSchedulerOpen, setIsMsgSchedulerOpen] = useState(false);
+  const [msgScheduleText, setMsgScheduleText] = useState('');
+  const [msgScheduleType, setMsgScheduleType] = useState<'specific_date' | 'repeat'>('specific_date');
+  const [msgScheduleDate, setMsgScheduleDate] = useState('');
+  const [msgScheduleTime, setMsgScheduleTime] = useState('');
+  const [msgRepeatDays, setMsgRepeatDays] = useState(3);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const selectedConversation = conversations.find(c => c.psid === selectedPsid);
@@ -110,7 +118,6 @@ const MessengerCRM: React.FC<MessengerCRMProps> = ({
   const filteredTemplates = savedReplies.filter(reply => {
       const matchesSearch = reply.label.toLowerCase().includes(templateSearch.toLowerCase()) || reply.text.toLowerCase().includes(templateSearch.toLowerCase());
       const matchesCategory = templateCategory === 'All' || (reply.status && reply.status.includes(templateCategory));
-      // Note: We are reusing the 'status' field in SavedReply to store 'category' for this prototype
       return matchesSearch && matchesCategory;
   });
 
@@ -176,7 +183,6 @@ const MessengerCRM: React.FC<MessengerCRMProps> = ({
           ).join('\n---\n');
 
           // 3. Construct System Prompt using dynamic Persona
-          // IMPORTANT: Modified prompt for Bengali Language
           const prompt = `
           CONTEXT:
           You are an expert Sales Agent for a Bangladeshi Digital Agency.
@@ -211,7 +217,6 @@ const MessengerCRM: React.FC<MessengerCRMProps> = ({
                   setInputText(response.text.trim());
               }
           } else {
-              // Fallback placeholder for OpenAI if configured in future
               alert("OpenAI integration pending. Please use Gemini provider.");
           }
 
@@ -238,7 +243,6 @@ const MessengerCRM: React.FC<MessengerCRMProps> = ({
   };
 
   const insertTemplate = (text: string) => {
-      // Append text instead of replace
       setInputText(prev => prev ? `${prev} ${text}` : text);
   };
 
@@ -254,8 +258,6 @@ const MessengerCRM: React.FC<MessengerCRMProps> = ({
           if(isVideo) type = AttachmentType.VIDEO;
           if(isAudio) type = AttachmentType.AUDIO;
 
-          // Simulate upload by creating a fake URL or using a placeholder
-          // In real app, you would upload to server here.
           const fakeUrl = URL.createObjectURL(file);
           
           onSendMessage(selectedPsid, `${file.name}`, type, fakeUrl);
@@ -265,13 +267,11 @@ const MessengerCRM: React.FC<MessengerCRMProps> = ({
   const handleVoiceRecord = () => {
       if(isRecording) {
           setIsRecording(false);
-          // Simulate sending voice note
           if(selectedPsid) {
               onSendMessage(selectedPsid, "Voice Message", AttachmentType.AUDIO, "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3");
           }
       } else {
           setIsRecording(true);
-          // In real app, trigger MediaRecorder API
       }
   };
 
@@ -287,7 +287,6 @@ const MessengerCRM: React.FC<MessengerCRMProps> = ({
     }
   };
 
-  // Helper to generate deterministic distinct colors for tags
   const getTagStyle = (tag: string) => {
     const lower = tag.toLowerCase();
     if (lower.includes('urgent') || lower.includes('issue')) return 'bg-red-50 text-red-600 border-red-200';
@@ -361,7 +360,6 @@ const MessengerCRM: React.FC<MessengerCRMProps> = ({
   const handleSaveReply = () => {
     if(!newReplyLabel || !newReplyText) return;
 
-    // Store Category in 'status' field as a hack for this prototype
     const replyData = {
         id: editingReplyId || Date.now().toString(),
         label: newReplyLabel,
@@ -375,7 +373,6 @@ const MessengerCRM: React.FC<MessengerCRMProps> = ({
         onAddReply(replyData);
     }
     
-    // Reset and show all templates to ensure new one is visible
     setEditingReplyId(null);
     setNewReplyLabel('');
     setNewReplyText('');
@@ -387,7 +384,6 @@ const MessengerCRM: React.FC<MessengerCRMProps> = ({
       setEditingReplyId(reply.id);
       setNewReplyLabel(reply.label);
       setNewReplyText(reply.text);
-      // Try to extract category from status array
       if(reply.status && reply.status.length > 0 && categories.includes(reply.status[0])) {
           setTemplateCategory(reply.status[0]);
       }
@@ -435,6 +431,54 @@ const MessengerCRM: React.FC<MessengerCRMProps> = ({
           setScheduleTime('');
           alert('Meeting Scheduled Successfully!');
       }
+  };
+
+  // --- Message Scheduler Handlers ---
+  const handleAddScheduledMessage = () => {
+      if (!selectedConversation || !msgScheduleText) return;
+
+      let nextRunDate = new Date();
+      if (msgScheduleType === 'specific_date') {
+          if (!msgScheduleDate || !msgScheduleTime) return alert("Please select date and time");
+          nextRunDate = new Date(`${msgScheduleDate}T${msgScheduleTime}`);
+      } else {
+          // Start immediately or next slot? Let's start now for Repeat
+          nextRunDate = new Date(); 
+      }
+
+      const newMessage: ScheduledMessage = {
+          id: Date.now().toString(),
+          text: msgScheduleText,
+          type: msgScheduleType,
+          scheduledDate: msgScheduleType === 'specific_date' ? nextRunDate : undefined,
+          repeatIntervalDays: msgScheduleType === 'repeat' ? msgRepeatDays : undefined,
+          nextRun: nextRunDate,
+          status: 'active',
+          createdAt: new Date()
+      };
+
+      const updatedList = [...(selectedConversation.scheduledMessages || []), newMessage];
+      if (onUpdateScheduledMessages) {
+          onUpdateScheduledMessages(selectedConversation.psid, updatedList, !!selectedConversation.isAutomationPaused);
+      }
+      
+      setMsgScheduleText('');
+      // Keep modal open to add more
+  };
+
+  const handleDeleteScheduledMessage = (id: string) => {
+      if (!selectedConversation || !onUpdateScheduledMessages) return;
+      const updatedList = (selectedConversation.scheduledMessages || []).filter(m => m.id !== id);
+      onUpdateScheduledMessages(selectedConversation.psid, updatedList, !!selectedConversation.isAutomationPaused);
+  };
+
+  const toggleAutomationPause = () => {
+      if (!selectedConversation || !onUpdateScheduledMessages) return;
+      onUpdateScheduledMessages(
+          selectedConversation.psid, 
+          selectedConversation.scheduledMessages || [], 
+          !selectedConversation.isAutomationPaused
+      );
   };
 
   const getAiStatusIcon = () => {
@@ -502,6 +546,9 @@ const MessengerCRM: React.FC<MessengerCRMProps> = ({
                       {conv.userName}
                     </h3>
                     <div className="flex items-center gap-1">
+                        {conv.scheduledMessages && conv.scheduledMessages.length > 0 && !conv.isAutomationPaused && (
+                            <Clock size={12} className="text-violet-500" />
+                        )}
                         {conv.aiEnabled && aiSettings.activeMode !== 'manual' && <Bot size={12} className="text-emerald-500" />}
                         <span className="text-[10px] text-slate-400 flex-shrink-0">
                         {lastMsg ? format(lastMsg.createdTime, 'MMM d') : ''}
@@ -613,6 +660,14 @@ const MessengerCRM: React.FC<MessengerCRMProps> = ({
                     title="Send Voice Note"
                   >
                       <Mic size={20} />
+                  </button>
+                  {/* --- NEW SCHEDULE BUTTON --- */}
+                  <button 
+                    onClick={() => setIsMsgSchedulerOpen(true)}
+                    className={`p-2 rounded-full transition-colors hover:bg-slate-100 ${selectedConversation.scheduledMessages?.length ? 'text-violet-600 bg-violet-50' : 'text-slate-500 hover:text-violet-600'}`}
+                    title="Schedule Messages / Drip"
+                  >
+                      <Clock size={20} />
                   </button>
                 </div>
                 <div className="flex-1 bg-slate-100 rounded-2xl flex items-center p-1 relative">
@@ -898,7 +953,7 @@ const MessengerCRM: React.FC<MessengerCRMProps> = ({
                         onClick={() => {
                             alert("Sending Audit Report Link...");
                             // In real app, generate link and send
-                            onSendMessage(selectedConversation.psid, `Here is your Website Audit Report: ${window.location.origin}/audit/${selectedConversation.psid}`);
+                            onSendMessage(selectedConversation.psid, "Here is your Website Audit Report: https://portal.agency.com/audit/" + selectedConversation.psid);
                         }}
                         className="flex flex-col items-center justify-center p-2 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 transition-colors border border-emerald-100"
                      >
@@ -1030,6 +1085,127 @@ const MessengerCRM: React.FC<MessengerCRMProps> = ({
                           <button type="button" onClick={() => setIsScheduleModalOpen(false)} className="flex-1 bg-slate-100 text-slate-600 font-bold py-2.5 rounded-lg hover:bg-slate-200">Cancel</button>
                       </div>
                   </form>
+              </div>
+          </div>
+      )}
+
+      {/* --- NEW MESSAGE SCHEDULER MODAL --- */}
+      {isMsgSchedulerOpen && selectedConversation && (
+          <div className="absolute inset-0 z-[60] bg-slate-900/60 flex items-center justify-center animate-in fade-in backdrop-blur-sm">
+              <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[80vh]">
+                  
+                  <div className="px-6 py-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+                      <div>
+                          <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                              <Clock className="text-violet-600" size={20} />
+                              Automated Drip Schedule
+                          </h3>
+                          <p className="text-xs text-slate-500">For: {selectedConversation.userName}</p>
+                      </div>
+                      <div className="flex items-center gap-4">
+                           <button 
+                              onClick={toggleAutomationPause}
+                              className={`text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-1 transition-colors ${selectedConversation.isAutomationPaused ? 'bg-slate-200 text-slate-600' : 'bg-emerald-100 text-emerald-700'}`}
+                           >
+                               {selectedConversation.isAutomationPaused ? <PlayCircle size={12} /> : <PauseCircle size={12} />}
+                               {selectedConversation.isAutomationPaused ? 'Paused' : 'Active'}
+                           </button>
+                           <button onClick={() => setIsMsgSchedulerOpen(false)} className="text-slate-400 hover:text-slate-600"><X size={20} /></button>
+                      </div>
+                  </div>
+
+                  <div className="flex-1 overflow-hidden flex flex-col md:flex-row">
+                      
+                      {/* LEFT: LIST OF SCHEDULED */}
+                      <div className="w-full md:w-1/2 border-r border-slate-100 p-4 overflow-y-auto bg-slate-50/50">
+                          <h4 className="text-xs font-bold text-slate-500 uppercase mb-3">Scheduled Messages ({selectedConversation.scheduledMessages?.length || 0})</h4>
+                          
+                          <div className="space-y-3">
+                              {selectedConversation.scheduledMessages?.filter(m => m.status !== 'sent').map(msg => (
+                                  <div key={msg.id} className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm group">
+                                      <div className="flex justify-between items-start mb-2">
+                                          <span className={`text-[9px] font-bold px-2 py-0.5 rounded uppercase ${msg.type === 'repeat' ? 'bg-blue-50 text-blue-600' : 'bg-orange-50 text-orange-600'}`}>
+                                              {msg.type === 'repeat' ? `Repeat ${msg.repeatIntervalDays}d` : 'One-Time'}
+                                          </span>
+                                          <button onClick={() => handleDeleteScheduledMessage(msg.id)} className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={12}/></button>
+                                      </div>
+                                      <p className="text-xs text-slate-700 line-clamp-2 mb-2 font-medium">"{msg.text}"</p>
+                                      <div className="flex items-center gap-1 text-[10px] text-slate-400">
+                                          <Clock size={10} /> Next: {format(new Date(msg.nextRun), 'MMM d, h:mm a')}
+                                      </div>
+                                  </div>
+                              ))}
+                              {(!selectedConversation.scheduledMessages || selectedConversation.scheduledMessages.length === 0) && (
+                                  <div className="text-center py-8 text-slate-400 text-xs">No messages scheduled.</div>
+                              )}
+                          </div>
+                      </div>
+
+                      {/* RIGHT: ADD NEW */}
+                      <div className="w-full md:w-1/2 p-4 flex flex-col">
+                          <h4 className="text-xs font-bold text-slate-500 uppercase mb-3">Add to Queue</h4>
+                          <div className="flex-1 space-y-4">
+                              <div>
+                                  <textarea 
+                                      className="w-full h-32 border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-violet-500 outline-none resize-none"
+                                      placeholder="Type message to schedule..."
+                                      value={msgScheduleText}
+                                      onChange={e => setMsgScheduleText(e.target.value)}
+                                  />
+                              </div>
+
+                              <div>
+                                  <label className="text-[10px] font-bold text-slate-500 uppercase block mb-2">Schedule Type</label>
+                                  <div className="flex bg-slate-100 p-1 rounded-lg">
+                                      <button 
+                                          onClick={() => setMsgScheduleType('specific_date')}
+                                          className={`flex-1 py-2 text-xs font-bold rounded-md transition-all ${msgScheduleType === 'specific_date' ? 'bg-white shadow text-violet-600' : 'text-slate-500'}`}
+                                      >
+                                          Specific Date
+                                      </button>
+                                      <button 
+                                          onClick={() => setMsgScheduleType('repeat')}
+                                          className={`flex-1 py-2 text-xs font-bold rounded-md transition-all ${msgScheduleType === 'repeat' ? 'bg-white shadow text-blue-600' : 'text-slate-500'}`}
+                                      >
+                                          Repeat Loop
+                                      </button>
+                                  </div>
+                              </div>
+
+                              {msgScheduleType === 'specific_date' ? (
+                                  <div className="grid grid-cols-2 gap-3">
+                                      <div>
+                                          <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Date</label>
+                                          <input type="date" value={msgScheduleDate} onChange={e => setMsgScheduleDate(e.target.value)} className="w-full border rounded-lg p-2 text-xs outline-none" />
+                                      </div>
+                                      <div>
+                                          <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Time</label>
+                                          <input type="time" value={msgScheduleTime} onChange={e => setMsgScheduleTime(e.target.value)} className="w-full border rounded-lg p-2 text-xs outline-none" />
+                                      </div>
+                                  </div>
+                              ) : (
+                                  <div>
+                                      <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Repeat Every (Days)</label>
+                                      <input 
+                                          type="number" 
+                                          value={msgRepeatDays} 
+                                          onChange={e => setMsgRepeatDays(parseInt(e.target.value))} 
+                                          className="w-full border rounded-lg p-2 text-xs outline-none" 
+                                          min="1"
+                                      />
+                                  </div>
+                              )}
+                          </div>
+                          <button 
+                              onClick={handleAddScheduledMessage}
+                              disabled={!msgScheduleText}
+                              className="w-full bg-violet-600 text-white py-3 rounded-xl font-bold text-sm hover:bg-violet-700 transition-all disabled:opacity-50 mt-4"
+                          >
+                              Add to Schedule
+                          </button>
+                      </div>
+                  </div>
+
               </div>
           </div>
       )}

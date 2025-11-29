@@ -134,11 +134,12 @@ export interface LowBalanceConfig {
 export interface ScheduledMessage {
     id: string;
     text: string;
-    date: Date;
-    type: 'one_time' | 'repeat';
+    type: 'specific_date' | 'repeat';
+    scheduledDate?: Date; 
     repeatIntervalDays?: number;
     nextRun: Date;
-    status: 'pending' | 'sent' | 'paused' | 'cancelled';
+    status: 'pending' | 'sent' | 'active' | 'paused';
+    createdAt: Date;
 }
 
 export interface Conversation {
@@ -148,7 +149,7 @@ export interface Conversation {
   messages: FbMessage[];
   status: LeadStatus;
   statusChangedDate?: Date; 
-  lastAutomatedMessageDate?: Date;
+  lastAutomatedMessageDate?: Date; 
   source: LeadSource; 
   notes?: string;
   aiSummary?: string; 
@@ -187,9 +188,9 @@ export interface Conversation {
   industry?: 'Clothing' | 'Food' | 'RealEstate' | 'Tech' | 'Health' | 'Education' | 'Other'; 
   
   serviceType?: ServiceType;
-
-  scheduledMessages?: ScheduledMessage[];
-  isAutomationPaused?: boolean;
+  
+  scheduledMessages?: ScheduledMessage[]; // NEW
+  isAutomationPaused?: boolean; // NEW
 }
 
 export interface SavedReply {

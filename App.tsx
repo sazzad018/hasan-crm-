@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
 import SettingsPanel from './components/SettingsPanel';
@@ -21,9 +22,9 @@ import ProposalBuilder from './components/ProposalBuilder';
 import AutomationHub from './components/AutomationHub'; 
 import AuditTool from './components/AuditTool'; 
 import DailyBriefingModal from './components/DailyBriefingModal'; 
-import { format, subDays, addDays, differenceInHours, isSameDay, differenceInDays, addMinutes } from 'date-fns';
+import { format, addDays, differenceInHours, isSameDay, differenceInDays, addMinutes } from 'date-fns';
 import { Conversation, PluginSettings, AttachmentType, LeadStatus, SavedReply, Meeting, Transaction, TransactionCategory, TransactionMetadata, ClientTask, AdminTask, FbMessage, ClientWebsite, PaymentMethod, AiKnowledgeItem, SmsSettings, SmsCampaign, AiSettings, PersonalAccount, InvoiceRecord, Proposal, DripSequence, AutoReportConfig, ServiceType, ScheduledMessage } from './types';
-import { Bell, X, Send, AlertTriangle } from 'lucide-react'; 
+import { Bell, X, Send, AlertTriangle, Loader2 } from 'lucide-react'; 
 
 // Helper function to replace missing date-fns export
 const dateSubDays = (date: Date, amount: number): Date => {
@@ -35,8 +36,10 @@ const dateSubDays = (date: Date, amount: number): Date => {
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [portalClientId, setPortalClientId] = useState<string | null>(null); 
+  const [selectedPsidForChat, setSelectedPsidForChat] = useState<string | null>(null); 
   const [isPublicMode, setIsPublicMode] = useState(false); 
   const [notifications, setNotifications] = useState<string[]>([]); 
+  const [isInitializing, setIsInitializing] = useState(true);
   
   // Daily Briefing State
   const [showDailyBriefing, setShowDailyBriefing] = useState(false);
@@ -214,7 +217,7 @@ const App: React.FC = () => {
           isEnabled: true,
           steps: [
               { id: 's1', dayDelay: 1, message: 'প্রিয় {{name}}, Social Ads Expert এ আগ্রহ দেখানোর জন্য ধন্যবাদ! 🤝 আমাদের পোর্টফোলিও এবং সফল প্রোজেক্টগুলো দেখতে এই লিংকে ক্লিক করুন: [LINK] - আমরা আপনার বিজনেসের গ্রোথ নিয়ে কথা বলতে চাই।' },
-              { id: 's2', dayDelay: 3, message: 'জানেন কি? সঠিক ফানেল স্ট্র্যাটেজি ব্যবহার করে আমাদের ক্লায়েন্টরা গড়ে ২০০% পর্যন্ত সেলস বাড়াতে পেরেছে। 🚀 আপনার বিজনেসেও এই স্ট্র্যাটেজি কিভাবে কাজ করবে তা জানতে আমাদের সাথে কথা বলুন।' },
+              { id: 's2', dayDelay: 3, message: 'জানেন কি? সঠিক ফানেল স্ট্র্যাটেজি ব্যবহার করে আমাদের ক্লায়েন্টরা গড়ে ২০০% পর্যন্ত সেলস বাড়াতে পেরেছে। 🚀 আপনার বিজনেসের জন্য এই স্ট্র্যাটেজি কিভাবে কাজ করবে তা জানতে আমাদের সাথে কথা বলুন।' },
               { id: 's3', dayDelay: 5, message: 'প্রিয় {{name}}, এই মাসে আমাদের প্রিমিয়াম কনসালটেশনের স্লট প্রায় শেষ। আপনি কি আপনার ফ্রি স্ট্র্যাটেজি কলটি বুক করতে চান? রিপ্লাই করুন "YES" অথবা কল করুন 017...' }
           ]
       },
@@ -339,6 +342,36 @@ CRITICAL INSTRUCTIONS:
       setTimeout(() => setNotifications(prev => prev.filter(n => n !== msg)), 5000);
   };
 
+  // Handle Send Message
+  const handleSendMessage = async (psid: string, text: string, attachmentType: AttachmentType = AttachmentType.TEXT, attachmentUrl?: string) => {
+      const newMessage = {
+          id: Date.now(),
+          messageText: text,
+          attachmentType: attachmentType,
+          attachmentUrl: attachmentUrl,
+          fbMid: `mid.page.${Date.now()}`,
+          isFromPage: true,
+          createdTime: new Date()
+      };
+
+      setConversations(prev => prev.map(c => {
+          if (c.psid === psid) {
+              return { ...c, messages: [...c.messages, newMessage], lastActive: new Date() };
+          }
+          return c;
+      }));
+
+      try {
+          await fetch(`${API_BASE_URL}/api/send_message.php`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ recipient_id: psid, message_text: text, attachment_type: attachmentType, attachment_url: attachmentUrl })
+          });
+      } catch(e) {
+          logApiWarning("send_message", e);
+      }
+  };
+
   const handleUpdateClientProfile = async (psid: string, data: Partial<Conversation>) => {
       setConversations(prev => prev.map(c => {
           if (c.psid === psid) {
@@ -375,8 +408,7 @@ CRITICAL INSTRUCTIONS:
 
   const handleUpdateIndustry = (psid: string, industry: string) => handleUpdateClientProfile(psid, { industry: industry as any });
   const handleUpdateServiceType = (psid: string, serviceType: string) => handleUpdateClientProfile(psid, { serviceType: serviceType as ServiceType });
-  const handleUpdateScheduledMessages = (psid: string, scheduledMessages: ScheduledMessage[], isPaused: boolean) => handleUpdateClientProfile(psid, { scheduledMessages, isAutomationPaused: isPaused });
-
+  
   // API Integration: Fetch Clients with Retry and Robust JSON Handling
   const fetchClients = async () => {
     let attempts = 0;
@@ -540,10 +572,24 @@ CRITICAL INSTRUCTIONS:
 
   // --- STARTUP LOGIC & AUTOMATION ENGINE ---
   useEffect(() => {
+    // 1. Parse Query Params (for Direct Portal Access)
+    const params = new URLSearchParams(window.location.search);
+    const urlPortalId = params.get('portal_id');
+
+    // 2. Start Data Fetch
     fetchClients();
+    
+    // 3. Handle Routing
+    if (urlPortalId) {
+        setPortalClientId(urlPortalId);
+        setActiveTab('portal_view');
+    }
+
+    setIsInitializing(false); // Finished init
+
     const interval = setInterval(fetchClients, 15000);
 
-    // DAILY BRIEFING CHECK LOGIC
+    // DAILY BRIEFING CHECK
     const checkBriefing = () => {
         const lastBriefingTime = localStorage.getItem('lastBriefingTime');
         const tenHours = 10 * 60 * 60 * 1000;
@@ -626,7 +672,6 @@ CRITICAL INSTRUCTIONS:
                         }
                     }
                 }
-
                 return updatedClient;
             });
 
@@ -645,21 +690,33 @@ CRITICAL INSTRUCTIONS:
     };
   }, [dripSequences]);
 
-  const handleCloseBriefing = () => {
-      setShowDailyBriefing(false);
-      localStorage.setItem('lastBriefingTime', Date.now().toString());
+  const handleCloseBriefing = () => { setShowDailyBriefing(false); localStorage.setItem('lastBriefingTime', Date.now().toString()); };
+  const handleBriefingQuickAction = (action: string, id: string) => { 
+      if (action === 'sms_reminder') addNotification(`SMS Reminder queued for client ID: ${id}`);
+      else if (action === 'call') window.open(`tel:${id}`);
+      else if (action === 'chat') { handleOpenChatFromSchedule(id); setShowDailyBriefing(false); }
   };
 
-  const handleBriefingQuickAction = (action: string, id: string) => {
-      if (action === 'sms_reminder') {
-          // Trigger SMS logic
-          addNotification(`SMS Reminder queued for client ID: ${id}`);
-      } else if (action === 'call') {
-          window.open(`tel:${id}`);
-      } else if (action === 'chat') {
-          handleOpenChatFromSchedule(id);
-          setShowDailyBriefing(false);
+  // Define handleOpenChatFromSchedule HERE, BEFORE it is used
+  const handleOpenChatFromSchedule = (psid: string) => { 
+      setActiveTab('messages'); 
+      setSelectedPsidForChat(psid); 
+  };
+
+  const handleOpenPortal = (psid: string) => {
+      setPortalClientId(psid);
+      setActiveTab('portal_view');
+  };
+
+  const handlePortalExit = () => {
+      // Clear URL param if exists
+      const url = new URL(window.location.href);
+      if (url.searchParams.has('portal_id')) {
+          url.searchParams.delete('portal_id');
+          window.history.pushState({}, '', url);
       }
+      setPortalClientId(null);
+      setActiveTab('client_report');
   };
 
   const handleManualSendSubmit = () => {
@@ -667,7 +724,6 @@ CRITICAL INSTRUCTIONS:
           handleSendMessage(manualSendRequired.client.psid, manualFallbackMessage);
           alert(`Message Sent to ${manualSendRequired.client.userName}! System marked as handled for today.`);
           
-          // Mark as sent in conversation to avoid re-triggering today
           setConversations(prev => prev.map(c => {
               if (c.psid === manualSendRequired.client.psid) {
                   return { ...c, lastAutomatedMessageDate: new Date() };
@@ -707,21 +763,92 @@ CRITICAL INSTRUCTIONS:
   const handleDeleteWebsite = (id: string) => setWebsites(websites.filter(s => s.id !== id));
 
   const [settings, setSettings] = useState<PluginSettings>({
-      pageAccessToken: '', verifyToken: 'my_custom_verify_token', appId: '', appSecret: '', webhookUrl: 'https://akafshop.com/api/webhook.php', googleSheetId: '', googleServiceAccountJson: ''
+      pageAccessToken: '',
+      verifyToken: '',
+      appId: '',
+      appSecret: '',
+      webhookUrl: 'https://example.com/webhook',
+      googleSheetId: '',
+      googleServiceAccountJson: ''
   });
 
   const handleSaveSettings = async () => {
-      try {
-          await fetch(`${API_BASE_URL}/api/save_settings.php`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(settings)
-          });
-          alert("Settings saved to Database!");
-      } catch (e) {
-          logApiWarning("save_settings", e);
-          alert("Settings saved locally (Demo Mode).");
+      try { await fetch(`${API_BASE_URL}/api/save_settings.php`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(settings) }); alert("Settings saved!"); } 
+      catch (e) { logApiWarning("save_settings", e); alert("Settings saved locally (Demo Mode)."); }
+  };
+
+  const handleAddManualLead = (leadData: Partial<Conversation>) => {
+      const newLead: Conversation = {
+          psid: leadData.psid || `manual_${Date.now()}`,
+          userName: leadData.userName || 'New Lead',
+          status: 'new_lead',
+          source: 'manual',
+          unreadCount: 0,
+          lastActive: new Date(),
+          messages: [],
+          tags: [],
+          dealValue: leadData.dealValue || 0,
+          downloadCount: 0,
+          smsCount: 0,
+          transactions: [],
+          tasks: [],
+          invoices: [],
+          ...leadData
+      };
+      setConversations(prev => [newLead, ...prev]);
+      if(leadData.source === 'web_form') {
+          addNotification(`New Web Inquiry: ${newLead.userName}`);
+      } else {
+          addNotification(`Manual Lead Added: ${newLead.userName}`);
       }
+  };
+
+  const handleScheduleMeeting = (psid: string, title: string, date: Date, reminderConfig?: { enabled: boolean, timeBefore: number, message: string }) => {
+      const client = conversations.find(c => c.psid === psid);
+      const newMeeting: Meeting = {
+          id: `meet_${Date.now()}`,
+          psid,
+          clientName: client?.userName || 'Unknown',
+          title,
+          date,
+          status: 'pending',
+          reminder: reminderConfig
+      };
+      setMeetings(prev => [...prev, newMeeting].sort((a,b) => a.date.getTime() - b.date.getTime()));
+      
+      // Integrate with Message Scheduler for Reminders
+      if (reminderConfig && reminderConfig.enabled && client) {
+          const reminderTime = new Date(date.getTime() - (reminderConfig.timeBefore * 60 * 1000));
+          
+          // Only schedule if it's in the future
+          if (reminderTime > new Date()) {
+              const reminderMsg: ScheduledMessage = {
+                  id: `rem_${Date.now()}`,
+                  text: reminderConfig.message,
+                  type: 'specific_date',
+                  scheduledDate: reminderTime,
+                  nextRun: reminderTime,
+                  status: 'active',
+                  createdAt: new Date()
+              };
+              
+              const updatedList = [...(client.scheduledMessages || []), reminderMsg];
+              handleUpdateScheduledMessages(psid, updatedList, !!client.isAutomationPaused);
+              addNotification(`Meeting & Auto-Reminder set for ${client.userName}`);
+          } else {
+              addNotification(`Meeting set for ${client.userName} (Reminder skipped - time passed)`);
+          }
+      } else {
+          addNotification(`Meeting Scheduled: ${title}`);
+      }
+  };
+
+  const handleDeleteMeeting = (id: string) => {
+      setMeetings(prev => prev.filter(m => m.id !== id));
+  };
+
+  const handleToggleMeetingStatus = (id: string) => {
+      setMeetings(prev => prev.map(m => m.id === id ? { ...m, status: m.status === 'pending' ? 'completed' : 'pending' } : m));
   };
 
   const handleUpdateStatus = (psid: string, status: LeadStatus) => handleUpdateClientProfile(psid, { status });
@@ -729,121 +856,19 @@ CRITICAL INSTRUCTIONS:
   const handleUpdateNotes = (psid: string, notes: string) => handleUpdateClientProfile(psid, { notes });
   const handleUpdateTags = (psid: string, tags: string[]) => handleUpdateClientProfile(psid, { tags });
   const handleUpdateDealValue = (psid: string, value: number) => handleUpdateClientProfile(psid, { dealValue: value });
-  
   const handleToggleAi = (psid: string, enabled: boolean) => handleUpdateClientProfile(psid, { aiEnabled: enabled });
-  const handleToggleBestQuality = (psid: string) => {
-      const client = conversations.find(c => c.psid === psid);
-      if (client) handleUpdateClientProfile(psid, { isBestQuality: !client.isBestQuality });
-  };
-
-  const handleLeadsExported = (psids: string[]) => {
-    setConversations(prev => prev.map(c => psids.includes(c.psid) ? { ...c, downloadCount: c.downloadCount + 1 } : c));
-  };
-
-  const handleSmsSent = (psids: string[]) => {
-      setConversations(prev => prev.map(c => psids.includes(c.psid) ? { ...c, smsCount: (c.smsCount || 0) + 1 } : c));
-  };
-
-  const handleSendMessage = async (psid: string, text: string, attachmentType: AttachmentType = AttachmentType.TEXT, attachmentUrl?: string) => {
-      const newMessage = {
-          id: Date.now(),
-          messageText: text,
-          attachmentType: attachmentType,
-          attachmentUrl: attachmentUrl,
-          fbMid: `mid.page.${Date.now()}`,
-          isFromPage: true,
-          createdTime: new Date()
-      };
-
-      setConversations(prev => prev.map(c => {
-          if (c.psid === psid) {
-              return { ...c, messages: [...c.messages, newMessage], lastActive: new Date() };
-          }
-          return c;
-      }));
-
-      try {
-          await fetch(`${API_BASE_URL}/api/send_message.php`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ recipient_id: psid, message_text: text, attachment_type: attachmentType, attachment_url: attachmentUrl })
-          });
-      } catch(e) {
-          logApiWarning("send_message", e);
-      }
-  };
-
-  // Template Handlers
+  const handleToggleBestQuality = (psid: string) => { const client = conversations.find(c => c.psid === psid); if (client) handleUpdateClientProfile(psid, { isBestQuality: !client.isBestQuality }); };
+  const handleLeadsExported = (psids: string[]) => { setConversations(prev => prev.map(c => psids.includes(c.psid) ? { ...c, downloadCount: c.downloadCount + 1 } : c)); };
+  const handleSmsSent = (psids: string[]) => { setConversations(prev => prev.map(c => psids.includes(c.psid) ? { ...c, smsCount: (c.smsCount || 0) + 1 } : c)); };
   const handleAddReply = (reply: SavedReply) => setSavedReplies([...savedReplies, reply]);
   const handleUpdateReply = (updatedReply: SavedReply) => setSavedReplies(savedReplies.map(r => r.id === updatedReply.id ? updatedReply : r));
   const handleDeleteReply = (id: string) => setSavedReplies(savedReplies.filter(r => r.id !== id));
-
-  // AI Knowledge Base Handlers
   const handleAddAiKnowledge = (item: AiKnowledgeItem) => setAiKnowledgeBase([...aiKnowledgeBase, item]);
   const handleUpdateAiKnowledge = (updatedItem: AiKnowledgeItem) => setAiKnowledgeBase(aiKnowledgeBase.map(item => item.id === updatedItem.id ? updatedItem : item));
   const handleDeleteAiKnowledge = (id: string) => setAiKnowledgeBase(aiKnowledgeBase.filter(item => item.id !== id));
-
-  // SMS Handlers
   const handleSaveSmsSettings = (newSettings: SmsSettings) => setSmsSettings(newSettings);
   const handleSaveSmsCampaign = (campaign: SmsCampaign) => setSmsHistory([campaign, ...smsHistory]);
-
-  const handleAddManualLead = async (leadData: Partial<Conversation>) => {
-    const newLead: Conversation = {
-        psid: leadData.psid || `manual_${Date.now()}`,
-        userName: leadData.userName || 'Unknown Lead',
-        status: leadData.status || 'new_lead',
-        source: leadData.source || 'manual',
-        unreadCount: 0,
-        downloadCount: 0,
-        smsCount: 0,
-        lastActive: new Date(),
-        aiSummary: 'New entry added via form/admin.',
-        tags: [],
-        dealValue: 0,
-        messages: [{ id: Date.now(), messageText: 'Lead created in system.', attachmentType: AttachmentType.TEXT, fbMid: 'manual_entry', createdTime: new Date() }],
-        extractedMobile: leadData.extractedMobile,
-        extractedWebsite: leadData.extractedWebsite,
-        extractedFbLink: leadData.extractedFbLink,
-        notes: leadData.notes,
-        businessInfo: leadData.businessInfo,
-        invoices: []
-    };
-
-    setConversations([newLead, ...conversations]);
-
-    try {
-        await fetch(`${API_BASE_URL}/api/save_lead.php`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(newLead)
-        });
-    } catch (e) {
-        logApiWarning("save_lead", e);
-    }
-  };
-
-  const handleScheduleMeeting = (psid: string, title: string, date: Date, reminderConfig?: { enabled: boolean, timeBefore: number, message: string }) => {
-      const client = conversations.find(c => c.psid === psid);
-      if(!client) return;
-      const newMeeting: Meeting = {
-          id: Date.now().toString(),
-          psid,
-          clientName: client.userName,
-          title,
-          date,
-          status: 'pending',
-          reminder: reminderConfig
-      };
-      setMeetings([...meetings, newMeeting]);
-  };
-
-  const handleDeleteMeeting = (id: string) => setMeetings(meetings.filter(m => m.id !== id));
-  const handleToggleMeetingStatus = (id: string) => setMeetings(meetings.map(m => m.id === id ? { ...m, status: m.status === 'pending' ? 'completed' : 'pending' } : m));
   
-  const [selectedPsidForChat, setSelectedPsidForChat] = useState<string | null>(null);
-  const handleOpenChatFromSchedule = (psid: string) => { setActiveTab('messages'); setSelectedPsidForChat(psid); };
-  const handleOpenPortal = (psid: string) => { setPortalClientId(psid); setActiveTab('portal_view'); };
-
   const handleFundUpdate = async (
       psid: string, 
       amount: number, 
@@ -1123,6 +1148,10 @@ CRITICAL INSTRUCTIONS:
     });
   };
 
+  const handleUpdateScheduledMessages = (psid: string, messages: ScheduledMessage[], isPaused: boolean) => {
+      handleUpdateClientProfile(psid, { scheduledMessages: messages, isAutomationPaused: isPaused });
+  };
+
   const renderContent = () => {
     switch (activeTab) {
       case 'settings': return <SettingsPanel settings={settings} updateSettings={setSettings} onSave={handleSaveSettings} />;
@@ -1176,7 +1205,18 @@ CRITICAL INSTRUCTIONS:
       const client = conversations.find(c => c.psid === portalClientId);
       if (client) {
           return (
-              <ClientPortal client={client} onTopUp={(psid, amount) => handleFundUpdate(psid, amount, 'credit', 'Online Top-up', 'payment')} onToggleTask={handleToggleTask} onExit={() => setActiveTab('client_report')} paymentMethods={paymentMethods} />
+              <ClientPortal client={client} onTopUp={(psid, amount) => handleFundUpdate(psid, amount, 'credit', 'Online Top-up', 'payment')} onToggleTask={handleToggleTask} onExit={handlePortalExit} paymentMethods={paymentMethods} />
+          );
+      } else if (!isLoading) {
+          return (
+              <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
+                  <div className="bg-white p-8 rounded-xl shadow-lg text-center max-w-md border border-slate-200">
+                      <AlertTriangle size={48} className="text-red-500 mx-auto mb-4" />
+                      <h2 className="text-xl font-bold text-slate-800 mb-2">Portal Not Found</h2>
+                      <p className="text-slate-500 mb-6">The client ID provided in the link does not match any records in our database.</p>
+                      <button onClick={() => window.location.href = '/'} className="bg-slate-900 text-white px-6 py-2 rounded-lg font-bold">Go Home</button>
+                  </div>
+              </div>
           );
       }
   }
@@ -1244,14 +1284,8 @@ CRITICAL INSTRUCTIONS:
           </div>
       )}
 
-      {/* DAILY BRIEFING MODAL */}
       {showDailyBriefing && (
-          <DailyBriefingModal 
-              conversations={conversations} 
-              meetings={meetings} 
-              onClose={handleCloseBriefing}
-              onQuickAction={handleBriefingQuickAction}
-          />
+          <DailyBriefingModal conversations={conversations} meetings={meetings} onClose={handleCloseBriefing} onQuickAction={handleBriefingQuickAction} />
       )}
 
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />

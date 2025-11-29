@@ -1,21 +1,20 @@
+
 import React, { useState } from 'react';
-import { Save, Eye, EyeOff, Copy, Check, FileSpreadsheet, Settings, Database, Server } from 'lucide-react';
+import { Save, Eye, EyeOff, Copy, Check, FileSpreadsheet, Settings } from 'lucide-react';
 import { PluginSettings } from '../types';
 
 interface SettingsPanelProps {
   settings: PluginSettings;
   updateSettings: (newSettings: PluginSettings) => void;
   onSave: () => void;
-  onSyncData?: () => void;
 }
 
 const SettingsPanel: React.FC<SettingsPanelProps> = ({ 
-    settings, updateSettings, onSave, onSyncData
+    settings, updateSettings, onSave
 }) => {
   const [showSecret, setShowSecret] = useState(false);
   const [copied, setCopied] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [isSyncing, setIsSyncing] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -34,41 +33,8 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
       setIsSaving(false);
   };
 
-  const handleSyncClick = async () => {
-      if (!onSyncData) return;
-      if (!window.confirm("Are you sure you want to push all local/mock data to the database? This might take a moment.")) return;
-      
-      setIsSyncing(true);
-      await onSyncData();
-      setIsSyncing(false);
-  };
-
   return (
     <div className="max-w-4xl mx-auto space-y-6">
-      
-      {/* MIGRATION / SYNC PANEL */}
-      <div className="bg-gradient-to-r from-slate-900 to-slate-800 rounded-xl shadow-lg border border-slate-700 overflow-hidden text-white">
-          <div className="px-6 py-4 border-b border-slate-700 flex justify-between items-center">
-              <div className="flex gap-2 items-center">
-                  <Database className="text-[#9B7BE3]" size={20} />
-                  <h2 className="text-lg font-bold">Database Migration</h2>
-              </div>
-          </div>
-          <div className="p-6">
-              <p className="text-sm text-slate-300 mb-4">
-                  If you are moving from local/mock mode to a live Shared Hosting MySQL database, use this button to bulk upload your current leads and client data to the server.
-              </p>
-              <button 
-                onClick={handleSyncClick}
-                disabled={isSyncing || !onSyncData}
-                className="flex items-center gap-2 bg-[#9B7BE3] hover:bg-violet-600 text-white px-5 py-3 rounded-lg text-sm font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-violet-900/20"
-              >
-                {isSyncing ? <Server className="animate-pulse" size={18} /> : <Server size={18} />}
-                {isSyncing ? 'Syncing Data...' : 'Migrate Local Data to Database'}
-              </button>
-          </div>
-      </div>
-
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         {/* Header */}
         <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">

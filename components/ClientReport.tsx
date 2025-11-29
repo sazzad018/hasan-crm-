@@ -1,6 +1,7 @@
+
 import React, { useState } from 'react';
 import { Conversation, LeadStatus, PortalPermissions, Transaction, TransactionCategory, TransactionMetadata, LowBalanceConfig, InvoiceRecord, DripSequence, AttachmentType } from '../types';
-import { ExternalLink, CreditCard, User, Users, Copy, ArrowRight, ShieldCheck, Edit3, X, Save, Trash2, Plus, Minus, RefreshCw, Lock, Mail, MapPin, Briefcase, Megaphone, AlertTriangle, TrendingUp, Monitor, MousePointer2, Eye, MessageCircle, DollarSign, Calendar, ListTodo, DownloadCloud, CheckSquare, Square, AlertCircle, Clock, Globe, Smartphone, Edit2, BarChart3, FileText, Receipt, CheckCircle, Info, Bell, Zap, PauseCircle, PlayCircle, Send, Archive } from 'lucide-react';
+import { ExternalLink, CreditCard, User, Users, Copy, ArrowRight, ShieldCheck, Edit3, X, Save, Trash2, Plus, Minus, RefreshCw, Lock, Mail, MapPin, Briefcase, Megaphone, AlertTriangle, TrendingUp, Monitor, MousePointer2, Eye, MessageCircle, DollarSign, Calendar, ListTodo, DownloadCloud, CheckSquare, Square, AlertCircle, Clock, Globe, Smartphone, Edit2, BarChart3, FileText, Receipt, CheckCircle, Info, Bell, Zap, PauseCircle, PlayCircle, Send, Archive, Share2, Link, QrCode } from 'lucide-react';
 import { format, differenceInDays } from 'date-fns';
 
 interface ClientReportProps {
@@ -53,6 +54,9 @@ const ClientReport: React.FC<ClientReportProps> = ({
   // NEW: Win-Back Message Modal State
   const [winBackClient, setWinBackClient] = useState<Conversation | null>(null);
   const [winBackMessage, setWinBackMessage] = useState('');
+
+  // NEW: Share Portal Modal State
+  const [portalShareClient, setPortalShareClient] = useState<Conversation | null>(null);
 
   // DERIVED STATE
   const selectedClient = conversations.find(c => c.psid === selectedClientPsid) || null;
@@ -152,6 +156,10 @@ const ClientReport: React.FC<ClientReportProps> = ({
           alert(`Simulating SMS to ${winBackClient?.extractedMobile || 'Client'}:\n\n"${winBackMessage}"`);
           setWinBackClient(null);
       }
+  };
+
+  const openSharePortalModal = (client: Conversation) => {
+      setPortalShareClient(client);
   };
 
   // ... (Existing openEditModal, handleProfileUpdate, etc. kept same) ...
@@ -369,18 +377,25 @@ const ClientReport: React.FC<ClientReportProps> = ({
                                          {viewMode === 'active' ? (
                                              <>
                                                  <button 
+                                                    onClick={() => openSharePortalModal(client)}
+                                                    className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                                    title="Get Portal Link"
+                                                 >
+                                                     <Share2 size={16} /> 
+                                                 </button>
+                                                 <button 
+                                                    onClick={() => onOpenPortal(client.psid)}
+                                                    className="p-2 text-violet-600 hover:bg-violet-50 rounded-lg transition-colors"
+                                                    title="Open Portal (Preview)"
+                                                 >
+                                                     <ExternalLink size={16} />
+                                                 </button>
+                                                 <button 
                                                     onClick={() => handleStatusChange(client, 'past_client')}
                                                     className="p-2 text-slate-400 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-colors border border-transparent hover:border-orange-100"
                                                     title="Pause Project (Move to History)"
                                                  >
                                                      <PauseCircle size={16} />
-                                                 </button>
-                                                 <button 
-                                                    onClick={() => onOpenPortal(client.psid)}
-                                                    className="p-2 text-violet-600 hover:bg-violet-50 rounded-lg transition-colors"
-                                                    title="Open Portal"
-                                                 >
-                                                     <ExternalLink size={16} />
                                                  </button>
                                              </>
                                          ) : (
@@ -411,6 +426,86 @@ const ClientReport: React.FC<ClientReportProps> = ({
              </table>
          </div>
       </div>
+
+      {/* --- SHARE PORTAL MODAL --- */}
+      {portalShareClient && (
+        <div className="fixed inset-0 bg-slate-900/80 z-[150] flex items-center justify-center p-4 animate-in fade-in backdrop-blur-sm">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
+                <div className="bg-slate-900 p-6 text-white text-center relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-[#9B7BE3] rounded-full blur-3xl opacity-20 translate-x-1/2 -translate-y-1/2"></div>
+                    <h3 className="text-xl font-bold relative z-10">Client Portal Access</h3>
+                    <p className="text-slate-300 text-sm relative z-10 mt-1">Share this secure link with {portalShareClient.userName}</p>
+                    <button onClick={() => setPortalShareClient(null)} className="absolute top-4 right-4 text-slate-400 hover:text-white"><X size={24}/></button>
+                </div>
+                
+                <div className="p-8 space-y-6">
+                    
+                    {/* Link Box */}
+                    <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Secure Link</label>
+                        <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl p-2 pl-4">
+                            <Globe size={16} className="text-slate-400 flex-shrink-0" />
+                            <input 
+                                readOnly 
+                                value={`${window.location.origin}?portal_id=${portalShareClient.psid}`}
+                                className="bg-transparent border-none outline-none text-sm text-slate-600 flex-1 w-full truncate font-mono"
+                            />
+                            <button 
+                                onClick={() => {
+                                    navigator.clipboard.writeText(`${window.location.origin}?portal_id=${portalShareClient.psid}`);
+                                    alert("Link Copied!");
+                                }}
+                                className="bg-white border border-slate-200 hover:border-blue-500 hover:text-blue-600 text-slate-500 p-2 rounded-lg transition-colors"
+                            >
+                                <Copy size={16} />
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Actions Grid */}
+                    <div className="grid grid-cols-2 gap-4">
+                        <button 
+                            onClick={() => window.open(`${window.location.origin}?portal_id=${portalShareClient.psid}`, '_blank')}
+                            className="flex flex-col items-center justify-center gap-2 p-4 rounded-xl border border-slate-200 hover:border-violet-500 hover:bg-violet-50 transition-all group"
+                        >
+                            <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center text-slate-600 group-hover:bg-violet-500 group-hover:text-white transition-colors">
+                                <ExternalLink size={20} />
+                            </div>
+                            <span className="text-sm font-bold text-slate-700 group-hover:text-violet-700">Open in New Tab</span>
+                        </button>
+
+                        <button 
+                            onClick={() => {
+                                if(onSendMessage) {
+                                    const msg = `Hi ${portalShareClient.userName}, here is your personal dashboard link to view ads, expenses and download invoices: ${window.location.origin}?portal_id=${portalShareClient.psid}`;
+                                    onSendMessage(portalShareClient.psid, msg);
+                                    alert("Link sent via Message!");
+                                }
+                            }}
+                            className="flex flex-col items-center justify-center gap-2 p-4 rounded-xl border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50 transition-all group"
+                        >
+                            <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center text-slate-600 group-hover:bg-emerald-500 group-hover:text-white transition-colors">
+                                <Send size={20} />
+                            </div>
+                            <span className="text-sm font-bold text-slate-700 group-hover:text-emerald-700">Send to Client</span>
+                        </button>
+                    </div>
+
+                    {/* QR Section */}
+                    <div className="bg-slate-50 rounded-xl p-4 flex items-center gap-4 border border-slate-100">
+                        <div className="bg-white p-2 rounded border border-slate-200">
+                            <QrCode size={40} className="text-slate-800" /> 
+                        </div>
+                        <div>
+                            <p className="text-sm font-bold text-slate-700">Scan to View</p>
+                            <p className="text-xs text-slate-500">Client can scan this code to open portal on mobile.</p>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+      )}
 
       {/* --- QUICK WIN-BACK MESSAGE MODAL --- */}
       {winBackClient && (

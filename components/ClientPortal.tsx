@@ -255,7 +255,7 @@ const ClientPortal: React.FC<ClientPortalProps> = ({ client, onTopUp, onToggleTa
           {/* Welcome Header */}
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
               <div>
-                  <h1 className="text-2xl md:text-3xl font-bold text-slate-800">Financial Overview</h1>
+                  <h1 className="text-2xl md:text-3xl font-bold text-slate-800">Client Dashboard</h1>
                   <p className="text-slate-500 mt-2">Manage your project funds, view history, and stats.</p>
               </div>
               {client.clientEmail && (
