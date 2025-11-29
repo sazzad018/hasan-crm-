@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Conversation, LeadStatus, PortalPermissions, Transaction, TransactionCategory, TransactionMetadata, LowBalanceConfig, InvoiceRecord, DripSequence, AttachmentType } from '../types';
 import { ExternalLink, CreditCard, User, Users, Copy, ArrowRight, ShieldCheck, Edit3, X, Save, Trash2, Plus, Minus, RefreshCw, Lock, Mail, MapPin, Briefcase, Megaphone, AlertTriangle, TrendingUp, Monitor, MousePointer2, Eye, MessageCircle, DollarSign, Calendar, ListTodo, DownloadCloud, CheckSquare, Square, AlertCircle, Clock, Globe, Smartphone, Edit2, BarChart3, FileText, Receipt, CheckCircle, Info, Bell, Zap, PauseCircle, PlayCircle, Send, Archive, Share2, Link, QrCode } from 'lucide-react';
@@ -319,7 +318,7 @@ const ClientReport: React.FC<ClientReportProps> = ({
                                  <td className="px-6 py-4">
                                      <div className="flex items-center gap-3">
                                          <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-white ${viewMode === 'active' ? 'bg-violet-600' : 'bg-slate-400'}`}>
-                                             {client.userName.charAt(0)}
+                                             {(client.userName || '?').charAt(0)}
                                          </div>
                                          <div>
                                              <p className={`font-bold ${viewMode === 'active' ? 'text-slate-800' : 'text-slate-600'}`}>{client.userName}</p>
@@ -518,7 +517,7 @@ const ClientReport: React.FC<ClientReportProps> = ({
                   <div className="p-6 space-y-4">
                       <div className="flex items-center gap-3 mb-2">
                           <div className="w-10 h-10 bg-slate-200 rounded-full flex items-center justify-center text-slate-500 font-bold">
-                              {winBackClient.userName.charAt(0)}
+                              {(winBackClient.userName || '?').charAt(0)}
                           </div>
                           <div>
                               <p className="font-bold text-sm text-slate-800">{winBackClient.userName}</p>
@@ -561,7 +560,7 @@ const ClientReport: React.FC<ClientReportProps> = ({
                   <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
                       <div className="flex items-center gap-3">
                          <div className="w-10 h-10 rounded-full bg-violet-600 text-white flex items-center justify-center font-bold">
-                             {selectedClient.userName.charAt(0)}
+                             {(selectedClient.userName || '?').charAt(0)}
                          </div>
                          <div>
                              <h3 className="font-bold text-slate-800 text-lg">Manage Client</h3>
@@ -602,7 +601,7 @@ const ClientReport: React.FC<ClientReportProps> = ({
                                   <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex flex-col items-center text-center relative overflow-hidden">
                                       <div className="absolute top-0 w-full h-16 bg-gradient-to-r from-violet-500 to-indigo-500"></div>
                                       <div className="w-24 h-24 rounded-full bg-white text-violet-600 flex items-center justify-center text-4xl font-bold mb-3 shadow-lg border-4 border-white relative z-10 mt-4">
-                                          {selectedClient.userName.charAt(0)}
+                                          {(selectedClient.userName || '?').charAt(0)}
                                       </div>
                                       <h3 className="font-bold text-slate-800 text-lg">{selectedClient.userName}</h3>
                                       <p className="text-sm text-slate-500 mb-4">{selectedClient.servicePackage || 'No Plan Active'}</p>

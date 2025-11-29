@@ -32,6 +32,7 @@ import {
 
 const App: React.FC = () => {
   // IMPORTANT: Set this to your live server URL (No trailing slash)
+  // If running locally with PHP, it might be http://localhost/your-folder/api
   const API_BASE_URL = 'https://tracker.beautyzonebangladesh.com/api'; 
 
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -88,19 +89,53 @@ const App: React.FC = () => {
           if (!response.ok) throw new Error("Network response was not ok");
           const data = await response.json();
           
-          // Hydrate State
+          let loadedConversations: Conversation[] = [];
+
+          // Hydrate Conversations
           if(data.conversations) {
-              // Convert DB structure to App structure if needed
-              const formattedConvs = data.conversations.map((c: any) => ({
+              // Convert DB structure (snake_case) to App structure (camelCase)
+              loadedConversations = data.conversations.map((c: any) => ({
                   ...c,
-                  messages: c.messages || [], // Handle empty messages
+                  userName: c.user_name || c.userName || 'Unknown User', 
+                  extractedMobile: c.mobile || c.extractedMobile, 
+                  psid: c.psid,
+                  status: c.status || 'new_lead',
+                  source: c.source || 'manual',
+                  messages: c.messages || [],
                   tags: c.tags || [],
-                  lastActive: new Date(c.last_active || new Date())
+                  lastActive: new Date(c.last_active || c.lastActive || new Date()),
+                  walletBalance: c.wallet_balance ? parseFloat(c.wallet_balance) : (c.walletBalance || 0),
+                  dealValue: c.deal_value ? parseFloat(c.deal_value) : (c.dealValue || 0),
               }));
-              setConversations(formattedConvs);
+              setConversations(loadedConversations);
           }
-          if(data.meetings) setMeetings(data.meetings.map((m:any) => ({...m, date: new Date(m.meeting_date)})));
-          if(data.tasks) setAdminTasks(data.tasks);
+
+          // Hydrate Meetings
+          if(data.meetings) {
+              setMeetings(data.meetings.map((m:any) => {
+                  const clientPsid = m.client_psid || m.psid;
+                  const client = loadedConversations.find(c => c.psid === clientPsid);
+                  return {
+                      ...m,
+                      id: m.id || Date.now().toString(),
+                      psid: clientPsid,
+                      clientName: client ? client.userName : (m.clientName || 'Unknown'), 
+                      title: m.title || 'Untitled Meeting',
+                      date: new Date(m.meeting_date || m.date),
+                      status: m.status || 'pending'
+                  };
+              }));
+          }
+
+          // Hydrate Tasks
+          if(data.tasks) {
+              setAdminTasks(data.tasks.map((t:any) => ({
+                  ...t,
+                  id: t.id || Date.now().toString(),
+                  relatedClientId: t.related_client_psid || t.relatedClientId,
+                  createdAt: new Date(t.created_at || t.createdAt || new Date())
+              })));
+          }
           
       } catch (error) {
           console.error("Failed to fetch data, switching to Demo Mode:", error);
