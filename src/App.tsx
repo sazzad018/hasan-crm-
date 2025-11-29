@@ -27,11 +27,12 @@ import {
   Conversation, Meeting, AdminTask, SmsCampaign, AiSettings, 
   AiKnowledgeItem, SmsSettings, SavedReply, LeadStatus, 
   ClientWebsite, PersonalAccount, PaymentMethod, Proposal,
-  DripSequence, AutoReportConfig, PluginSettings, AttachmentType
+  DripSequence, AutoReportConfig, PluginSettings,
 } from './types';
 
 const App: React.FC = () => {
   // IMPORTANT: Set this to your live server URL
+  // আপনার ডোমেইন নাম এখানে বসান। শেষে স্ল্যাশ (/) দিবেন না।
   const API_BASE_URL = 'https://yourdomain.com'; 
 
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -47,16 +48,13 @@ const App: React.FC = () => {
           unreadCount: 0,
           downloadCount: 0,
           messages: [
-              { id: 1, messageText: 'How much for SEO?', attachmentType: AttachmentType.TEXT, fbMid: 'm1', createdTime: new Date(Date.now() - 86400000) },
-              { id: 2, messageText: 'Our package starts at 15k BDT.', attachmentType: AttachmentType.TEXT, fbMid: 'm2', isFromPage: true, createdTime: new Date(Date.now() - 86000000) }
+              { id: 1, messageText: 'How much for SEO?', attachmentType: 'text' as any, fbMid: 'm1', createdTime: new Date(Date.now() - 86400000) },
+              { id: 2, messageText: 'Our package starts at 15k BDT.', attachmentType: 'text' as any, fbMid: 'm2', isFromPage: true, createdTime: new Date(Date.now() - 86000000) }
           ],
           tags: ['VIP'],
           walletBalance: 5000,
           extractedMobile: '01700000000',
-          servicePackage: 'Gold SEO',
-          isBestQuality: true,
-          dealValue: 15000,
-          industry: 'Tech'
+          servicePackage: 'Gold SEO'
       },
       {
           psid: '1002',
@@ -66,11 +64,9 @@ const App: React.FC = () => {
           lastActive: new Date(Date.now() - 3600000),
           unreadCount: 1,
           downloadCount: 0,
-          messages: [{ id: 3, messageText: 'I need a website.', attachmentType: AttachmentType.TEXT, fbMid: 'm3', createdTime: new Date() }],
+          messages: [{ id: 3, messageText: 'I need a website.', attachmentType: 'text' as any, fbMid: 'm3', createdTime: new Date() }],
           tags: [],
-          extractedMobile: '01800000000',
-          dealValue: 0,
-          industry: 'Clothing'
+          extractedMobile: '01800000000'
       }
   ]);
   
@@ -119,55 +115,9 @@ const App: React.FC = () => {
   const [portalModeClient, setPortalModeClient] = useState<Conversation | null>(null);
   const [showBriefing, setShowBriefing] = useState(true); // Show briefing on load
   
-  // --- HANDLERS ---
-
+  // Handlers
   const handleUpdateStatus = (psid: string, status: LeadStatus) => {
       setConversations(prev => prev.map(c => c.psid === psid ? { ...c, status, statusChangedDate: new Date() } : c));
-  };
-
-  const handleScheduleMeeting = (psid: string, title: string, date: Date) => {
-      const client = conversations.find(c => c.psid === psid);
-      const newMeeting: Meeting = {
-          id: Date.now().toString(),
-          psid,
-          clientName: client ? client.userName : 'Unknown',
-          title,
-          date,
-          status: 'pending'
-      };
-      setMeetings(prev => [...prev, newMeeting]);
-  };
-
-  const handleDeleteMeeting = (id: string) => {
-      setMeetings(prev => prev.filter(m => m.id !== id));
-  };
-
-  const handleToggleMeetingStatus = (id: string) => {
-      setMeetings(prev => prev.map(m => m.id === id ? { ...m, status: m.status === 'pending' ? 'completed' : 'pending' } : m));
-  };
-
-  const handleAddTask = (title: string, description?: string, relatedClientId?: string) => {
-      const client = conversations.find(c => c.psid === relatedClientId);
-      const newTask: AdminTask = {
-          id: Date.now().toString(),
-          title,
-          description,
-          relatedClientId,
-          relatedClientName: client?.userName,
-          status: 'todo',
-          priority: 'medium',
-          isCompleted: false,
-          createdAt: new Date()
-      };
-      setAdminTasks(prev => [...prev, newTask]);
-  };
-
-  const handleUpdateTaskStatus = (id: string, status: 'todo' | 'in_progress' | 'done') => {
-      setAdminTasks(prev => prev.map(t => t.id === id ? { ...t, status, isCompleted: status === 'done' } : t));
-  };
-
-  const handleDeleteTask = (id: string) => {
-      setAdminTasks(prev => prev.filter(t => t.id !== id));
   };
 
   // URL Query Params check for Portal Mode
@@ -187,13 +137,7 @@ const App: React.FC = () => {
               client={portalModeClient} 
               onTopUp={() => {}} 
               onToggleTask={() => {}} 
-              onExit={() => {
-                  // Clean URL and exit portal mode
-                  const url = new URL(window.location.href);
-                  url.searchParams.delete('portal_id');
-                  window.history.replaceState({}, '', url.toString());
-                  setPortalModeClient(null);
-              }} 
+              onExit={() => setPortalModeClient(null)} 
               paymentMethods={paymentMethods}
           />
       );
@@ -221,6 +165,7 @@ const App: React.FC = () => {
                     if (action === 'chat') {
                         setActiveTab('messages');
                         setShowBriefing(false);
+                        // In real app, would allow auto-selecting the conversation
                     }
                 }}
             />
@@ -246,10 +191,7 @@ const App: React.FC = () => {
                 onExport={() => {}}
                 onAddManualLead={(lead) => setConversations(prev => [...prev, lead as Conversation])}
                 onUpdateStatus={handleUpdateStatus}
-                onOpenPublicLink={() => { 
-                    // Simulate opening a new tab
-                    window.open(window.location.origin + '/form/lead-gen', '_blank');
-                }}
+                onOpenPublicLink={() => { /* In real app, would navigate or open modal */ }}
                 onToggleBestQuality={(psid) => setConversations(prev => prev.map(c => c.psid === psid ? { ...c, isBestQuality: !c.isBestQuality } : c))}
                 onUpdateNotes={(psid, notes) => setConversations(prev => prev.map(c => c.psid === psid ? { ...c, notes } : c))}
                 onUpdateIndustry={(psid, industry) => setConversations(prev => prev.map(c => c.psid === psid ? { ...c, industry: industry as any } : c))}
@@ -271,7 +213,7 @@ const App: React.FC = () => {
                     const newMsg = {
                         id: Date.now(),
                         messageText: text,
-                        attachmentType: type || AttachmentType.TEXT,
+                        attachmentType: type || 'text',
                         attachmentUrl: url,
                         fbMid: `mid.${Date.now()}`,
                         isFromPage: true,
@@ -283,7 +225,7 @@ const App: React.FC = () => {
                 onUpdateReply={(reply) => setSavedReplies(prev => prev.map(r => r.id === reply.id ? reply : r))}
                 onDeleteReply={(id) => setSavedReplies(prev => prev.filter(r => r.id !== id))}
                 onUpdateSummary={(psid, summary) => setConversations(prev => prev.map(c => c.psid === psid ? { ...c, aiSummary: summary } : c))}
-                onScheduleMeeting={handleScheduleMeeting}
+                onScheduleMeeting={(psid, title, date) => setMeetings(prev => [...prev, { id: Date.now().toString(), psid, clientName: 'Client', title, date, status: 'pending' }])}
                 onUpdateTags={(psid, tags) => setConversations(prev => prev.map(c => c.psid === psid ? { ...c, tags } : c))}
                 onUpdateDealValue={(psid, val) => setConversations(prev => prev.map(c => c.psid === psid ? { ...c, dealValue: val } : c))}
                 onUpdateNotes={(psid, notes) => setConversations(prev => prev.map(c => c.psid === psid ? { ...c, notes } : c))}
@@ -317,9 +259,9 @@ const App: React.FC = () => {
             <ScheduleManager 
                 meetings={meetings}
                 conversations={conversations}
-                onScheduleMeeting={handleScheduleMeeting}
-                onDeleteMeeting={handleDeleteMeeting}
-                onToggleStatus={handleToggleMeetingStatus}
+                onScheduleMeeting={(psid, title, date) => setMeetings([...meetings, { id: Date.now().toString(), psid, clientName: 'Unknown', title, date, status: 'pending' }])}
+                onDeleteMeeting={(id) => setMeetings(prev => prev.filter(m => m.id !== id))}
+                onToggleStatus={(id) => setMeetings(prev => prev.map(m => m.id === id ? { ...m, status: m.status === 'pending' ? 'completed' : 'pending' } : m))}
                 onOpenChat={(psid) => setActiveTab('messages')}
             />
         )}
@@ -334,10 +276,7 @@ const App: React.FC = () => {
             <ClientReport 
                 conversations={conversations}
                 dripSequences={dripSequences}
-                onOpenPortal={(psid) => {
-                    // Logic is handled via link in ClientReport component, but we can log here
-                    console.log("Opening portal for", psid);
-                }}
+                onOpenPortal={(psid) => {}}
                 onUpdateClientProfile={(psid, data) => setConversations(prev => prev.map(c => c.psid === psid ? { ...c, ...data } : c))}
                 onManageBalance={(psid, amount, type, description, category, metadata, date) => {
                     setConversations(prev => prev.map(c => {
@@ -347,12 +286,7 @@ const App: React.FC = () => {
                         return { ...c, walletBalance: newBalance, transactions: [...(c.transactions || []), tx] };
                     }));
                 }}
-                onDeleteTransaction={(psid, txId) => {
-                    setConversations(prev => prev.map(c => {
-                        if (c.psid !== psid) return c;
-                        return { ...c, transactions: (c.transactions || []).filter(t => t.id !== txId) };
-                    }));
-                }}
+                onDeleteTransaction={() => {}}
                 onEditTransaction={() => {}}
                 onAddTask={(psid, title, type, priority, deadline) => {
                     setConversations(prev => prev.map(c => {
@@ -367,9 +301,7 @@ const App: React.FC = () => {
                         return { ...c, tasks: (c.tasks || []).filter(t => t.id !== taskId) };
                     }));
                 }}
-                onSendMessage={(psid, text) => { 
-                    alert(`Message sent to ${psid}: ${text}`);
-                }}
+                onSendMessage={(psid, text) => { /* Send */ }}
             />
         )}
         {activeTab === 'invoices' && (
@@ -382,9 +314,9 @@ const App: React.FC = () => {
             <TaskManager 
                 tasks={adminTasks}
                 conversations={conversations}
-                onAddTask={handleAddTask}
-                onUpdateStatus={handleUpdateTaskStatus}
-                onDeleteTask={handleDeleteTask}
+                onAddTask={(title, description, relatedClientId) => setAdminTasks([...adminTasks, { id: Date.now().toString(), title, description, relatedClientId, status: 'todo', priority: 'medium', isCompleted: false, createdAt: new Date() }])}
+                onUpdateStatus={(id, status) => setAdminTasks(prev => prev.map(t => t.id === id ? { ...t, status } : t))}
+                onDeleteTask={(id) => setAdminTasks(prev => prev.filter(t => t.id !== id))}
             />
         )}
         {activeTab === 'bulk_sms' && (
