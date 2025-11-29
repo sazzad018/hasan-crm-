@@ -378,18 +378,12 @@ const ClientReport: React.FC<ClientReportProps> = ({
                                              <>
                                                  <button 
                                                     onClick={() => openSharePortalModal(client)}
-                                                    className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                                                    title="Get Portal Link"
+                                                    className="px-3 py-1.5 bg-violet-50 text-violet-700 hover:bg-violet-100 rounded-lg text-xs font-bold transition-colors flex items-center gap-2 border border-violet-200"
+                                                    title="Share Access"
                                                  >
-                                                     <Share2 size={16} /> 
+                                                     <Share2 size={14} /> Share Portal
                                                  </button>
-                                                 <button 
-                                                    onClick={() => onOpenPortal(client.psid)}
-                                                    className="p-2 text-violet-600 hover:bg-violet-50 rounded-lg transition-colors"
-                                                    title="Open Portal (Preview)"
-                                                 >
-                                                     <ExternalLink size={16} />
-                                                 </button>
+                                                 
                                                  <button 
                                                     onClick={() => handleStatusChange(client, 'past_client')}
                                                     className="p-2 text-slate-400 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-colors border border-transparent hover:border-orange-100"
@@ -480,6 +474,8 @@ const ClientReport: React.FC<ClientReportProps> = ({
                                     const msg = `Hi ${portalShareClient.userName}, here is your personal dashboard link to view ads, expenses and download invoices: ${window.location.origin}?portal_id=${portalShareClient.psid}`;
                                     onSendMessage(portalShareClient.psid, msg);
                                     alert("Link sent via Message!");
+                                } else {
+                                    alert("SMS module not connected in preview.");
                                 }
                             }}
                             className="flex flex-col items-center justify-center gap-2 p-4 rounded-xl border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50 transition-all group"

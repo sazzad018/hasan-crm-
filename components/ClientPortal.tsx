@@ -232,7 +232,7 @@ const ClientPortal: React.FC<ClientPortalProps> = ({ client, onTopUp, onToggleTa
              <div className="w-8 h-8 bg-[#9B7BE3] rounded-lg flex items-center justify-center text-white font-bold">
                  C
              </div>
-             <span className="font-bold text-slate-800 tracking-tight">ClientPortal™</span>
+             <span className="font-bold text-slate-800 tracking-tight">Client Dashboard</span>
          </div>
          <div className="flex items-center gap-4">
              <div className="text-right hidden sm:block">
