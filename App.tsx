@@ -31,57 +31,18 @@ import {
 } from './types';
 
 const App: React.FC = () => {
-  // IMPORTANT: Set this to your live server URL
-  const API_BASE_URL = 'https://yourdomain.com'; 
+  // IMPORTANT: Set this to your live server URL (No trailing slash)
+  const API_BASE_URL = 'https://tracker.beautyzonebangladesh.com/api'; 
 
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [isLoading, setIsLoading] = useState(true);
   
-  // Data States with Mock Initial Data
-  const [conversations, setConversations] = useState<Conversation[]>([
-      {
-          psid: '1001',
-          userName: 'Rafiqul Islam',
-          status: 'active_client',
-          source: 'facebook',
-          lastActive: new Date(),
-          unreadCount: 0,
-          downloadCount: 0,
-          messages: [
-              { id: 1, messageText: 'How much for SEO?', attachmentType: AttachmentType.TEXT, fbMid: 'm1', createdTime: new Date(Date.now() - 86400000) },
-              { id: 2, messageText: 'Our package starts at 15k BDT.', attachmentType: AttachmentType.TEXT, fbMid: 'm2', isFromPage: true, createdTime: new Date(Date.now() - 86000000) }
-          ],
-          tags: ['VIP'],
-          walletBalance: 5000,
-          extractedMobile: '01700000000',
-          servicePackage: 'Gold SEO',
-          isBestQuality: true,
-          dealValue: 15000,
-          industry: 'Tech'
-      },
-      {
-          psid: '1002',
-          userName: 'Sadia Khan',
-          status: 'new_lead',
-          source: 'web_form',
-          lastActive: new Date(Date.now() - 3600000),
-          unreadCount: 1,
-          downloadCount: 0,
-          messages: [{ id: 3, messageText: 'I need a website.', attachmentType: AttachmentType.TEXT, fbMid: 'm3', createdTime: new Date() }],
-          tags: [],
-          extractedMobile: '01800000000',
-          dealValue: 0,
-          industry: 'Clothing'
-      }
-  ]);
+  // Data States (Initially Empty, will fill from DB)
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [meetings, setMeetings] = useState<Meeting[]>([]);
+  const [adminTasks, setAdminTasks] = useState<AdminTask[]>([]);
   
-  const [meetings, setMeetings] = useState<Meeting[]>([
-      { id: 'mt1', psid: '1001', clientName: 'Rafiqul Islam', title: 'Monthly Report Call', date: new Date(new Date().setHours(14, 0, 0, 0)), status: 'pending' }
-  ]);
-  
-  const [adminTasks, setAdminTasks] = useState<AdminTask[]>([
-      { id: 't1', title: 'Check server logs', priority: 'high', status: 'todo', isCompleted: false, createdAt: new Date() }
-  ]);
-  
+  // Local Only States (For settings/config mostly, unless you add tables for them)
   const [smsHistory, setSmsHistory] = useState<SmsCampaign[]>([]);
   const [aiKnowledgeBase, setAiKnowledgeBase] = useState<AiKnowledgeItem[]>([]);
   const [savedReplies, setSavedReplies] = useState<SavedReply[]>([
@@ -117,12 +78,144 @@ const App: React.FC = () => {
 
   // Derived State for specific views
   const [portalModeClient, setPortalModeClient] = useState<Conversation | null>(null);
-  const [showBriefing, setShowBriefing] = useState(true); // Show briefing on load
-  
-  // --- HANDLERS ---
+  const [showBriefing, setShowBriefing] = useState(true); 
 
-  const handleUpdateStatus = (psid: string, status: LeadStatus) => {
+  // --- API HANDLERS (FETCHER) ---
+  const fetchData = async () => {
+      try {
+          setIsLoading(true);
+          const response = await fetch(`${API_BASE_URL}/index.php?action=get_all_data`);
+          if (!response.ok) throw new Error("Network response was not ok");
+          const data = await response.json();
+          
+          // Hydrate State
+          if(data.conversations) {
+              // Convert DB structure to App structure if needed
+              const formattedConvs = data.conversations.map((c: any) => ({
+                  ...c,
+                  messages: c.messages || [], // Handle empty messages
+                  tags: c.tags || [],
+                  lastActive: new Date(c.last_active || new Date())
+              }));
+              setConversations(formattedConvs);
+          }
+          if(data.meetings) setMeetings(data.meetings.map((m:any) => ({...m, date: new Date(m.meeting_date)})));
+          if(data.tasks) setAdminTasks(data.tasks);
+          
+      } catch (error) {
+          console.error("Failed to fetch data, switching to Demo Mode:", error);
+          
+          // --- FALLBACK DUMMY DATA FOR DEMO MODE ---
+          setConversations([
+            {
+                psid: '1001',
+                userName: 'Rafiqul Islam',
+                status: 'active_client',
+                source: 'facebook',
+                lastActive: new Date(),
+                unreadCount: 0,
+                downloadCount: 0,
+                messages: [
+                    { id: 1, messageText: 'How much for SEO?', attachmentType: AttachmentType.TEXT, fbMid: 'm1', createdTime: new Date(Date.now() - 86400000) },
+                    { id: 2, messageText: 'Our package starts at 15k BDT.', attachmentType: AttachmentType.TEXT, fbMid: 'm2', isFromPage: true, createdTime: new Date(Date.now() - 86000000) }
+                ],
+                tags: ['VIP'],
+                walletBalance: 5000,
+                extractedMobile: '01700000000',
+                servicePackage: 'Gold SEO',
+                isBestQuality: true,
+                dealValue: 15000,
+                industry: 'Tech',
+                transactions: [
+                    { id: 'tx1', date: new Date(Date.now() - 864000000), type: 'credit', amount: 10000, description: 'Initial Deposit', status: 'completed' },
+                    { id: 'tx2', date: new Date(Date.now() - 432000000), type: 'debit', amount: 2000, description: 'Ad Spend (FB)', category: 'ad_spend', metadata: { impressions: 5000, reach: 4500, conversions: 12 }, status: 'completed' },
+                    { id: 'tx3', date: new Date(Date.now() - 100000000), type: 'debit', amount: 3000, description: 'Web Development Fee', category: 'web_dev', status: 'completed' }
+                ],
+                tasks: [
+                    { id: 'tsk1', title: 'Weekly ROI Report', type: 'weekly', priority: 'high', isCompleted: false, assignedDate: new Date(), deadline: new Date(Date.now() + 86400000) }
+                ]
+            },
+            {
+                psid: '1002',
+                userName: 'Sadia Khan',
+                status: 'new_lead',
+                source: 'web_form',
+                lastActive: new Date(Date.now() - 3600000),
+                unreadCount: 1,
+                downloadCount: 0,
+                messages: [{ id: 3, messageText: 'I need a website for my boutique.', attachmentType: AttachmentType.TEXT, fbMid: 'm3', createdTime: new Date() }],
+                tags: [],
+                extractedMobile: '01800000000',
+                dealValue: 0,
+                industry: 'Clothing'
+            },
+            {
+                psid: '1003',
+                userName: 'Karim Uddin',
+                status: 'negotiation',
+                source: 'facebook',
+                lastActive: new Date(Date.now() - 7200000),
+                unreadCount: 0,
+                downloadCount: 0,
+                messages: [
+                    { id: 4, messageText: 'Is the price negotiable?', attachmentType: AttachmentType.TEXT, fbMid: 'm4', createdTime: new Date(Date.now() - 7200000) }
+                ],
+                tags: ['Hot Lead'],
+                dealValue: 25000,
+                industry: 'RealEstate'
+            }
+          ]);
+          
+          setMeetings([
+              { id: 'mt1', psid: '1001', clientName: 'Rafiqul Islam', title: 'Monthly Report Call', date: new Date(new Date().setHours(14, 0, 0, 0)), status: 'pending' }
+          ]);
+          
+          setAdminTasks([
+              { id: 't1', title: 'Check server logs', priority: 'high', status: 'todo', isCompleted: false, createdAt: new Date() },
+              { id: 't2', title: 'Update ad creatives for Eid', priority: 'medium', status: 'in_progress', isCompleted: false, createdAt: new Date() }
+          ]);
+
+      } finally {
+          setIsLoading(false);
+      }
+  };
+
+  useEffect(() => {
+      fetchData();
+  }, []);
+
+  // --- ACTION HANDLERS ---
+
+  const handleUpdateStatus = async (psid: string, status: LeadStatus) => {
+      // Optimistic UI Update
       setConversations(prev => prev.map(c => c.psid === psid ? { ...c, status, statusChangedDate: new Date() } : c));
+      
+      // API Call
+      try {
+          await fetch(`${API_BASE_URL}/index.php?action=update_status`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ psid, status })
+          });
+      } catch (e) {
+          console.error("Update failed (Demo Mode active)", e);
+          // Alert intentionally omitted to keep demo smooth
+      }
+  };
+
+  const handleAddManualLead = async (lead: Partial<Conversation>) => {
+      const newLead = { ...lead, id: Date.now().toString() } as Conversation;
+      setConversations(prev => [...prev, newLead]); // Optimistic
+
+      try {
+          await fetch(`${API_BASE_URL}/index.php?action=add_lead`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(newLead)
+          });
+      } catch (e) {
+          console.error("Add lead failed (Demo Mode active)", e);
+      }
   };
 
   const handleScheduleMeeting = (psid: string, title: string, date: Date) => {
@@ -136,6 +229,7 @@ const App: React.FC = () => {
           status: 'pending'
       };
       setMeetings(prev => [...prev, newMeeting]);
+      // Add API call here similarly...
   };
 
   const handleDeleteMeeting = (id: string) => {
@@ -188,7 +282,6 @@ const App: React.FC = () => {
               onTopUp={() => {}} 
               onToggleTask={() => {}} 
               onExit={() => {
-                  // Clean URL and exit portal mode
                   const url = new URL(window.location.href);
                   url.searchParams.delete('portal_id');
                   window.history.replaceState({}, '', url.toString());
@@ -202,9 +295,18 @@ const App: React.FC = () => {
   // Render Public Form if route matches
   if (window.location.pathname === '/form/lead-gen') {
       return <PublicLeadForm onSubmit={(data) => {
-          setConversations(prev => [...prev, { ...data, id: Date.now().toString(), messages: [], tags: [], downloadCount: 0, lastActive: new Date(), unreadCount: 0 }]);
+          handleAddManualLead(data);
           alert("Submitted!");
       }} />;
+  }
+
+  if (isLoading) {
+      return (
+          <div className="min-h-screen flex items-center justify-center bg-slate-50">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+              <span className="ml-3 text-slate-500 font-bold">Loading CRM...</span>
+          </div>
+      );
   }
 
   return (
@@ -244,10 +346,9 @@ const App: React.FC = () => {
             <LeadDatabase 
                 conversations={conversations}
                 onExport={() => {}}
-                onAddManualLead={(lead) => setConversations(prev => [...prev, lead as Conversation])}
+                onAddManualLead={handleAddManualLead}
                 onUpdateStatus={handleUpdateStatus}
                 onOpenPublicLink={() => { 
-                    // Simulate opening a new tab
                     window.open(window.location.origin + '/form/lead-gen', '_blank');
                 }}
                 onToggleBestQuality={(psid) => setConversations(prev => prev.map(c => c.psid === psid ? { ...c, isBestQuality: !c.isBestQuality } : c))}
@@ -334,10 +435,7 @@ const App: React.FC = () => {
             <ClientReport 
                 conversations={conversations}
                 dripSequences={dripSequences}
-                onOpenPortal={(psid) => {
-                    // Logic is handled via link in ClientReport component, but we can log here
-                    console.log("Opening portal for", psid);
-                }}
+                onOpenPortal={(psid) => {}}
                 onUpdateClientProfile={(psid, data) => setConversations(prev => prev.map(c => c.psid === psid ? { ...c, ...data } : c))}
                 onManageBalance={(psid, amount, type, description, category, metadata, date) => {
                     setConversations(prev => prev.map(c => {
