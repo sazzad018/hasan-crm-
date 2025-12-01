@@ -276,27 +276,43 @@ const BulkSmsManager: React.FC<BulkSmsManagerProps> = ({
                 const paramMsg = settings.paramMap?.message || 'message';
                 const paramKey = settings.paramMap?.apiKey || 'api_key';
 
-                if(paramKey) params.append(paramKey, settings.apiKey);
+                if(paramKey && settings.apiKey) params.append(paramKey, settings.apiKey);
                 params.append(paramTo, mobile);
                 params.append(paramMsg, personalizedMsg);
                 if(settings.senderId) params.append('sender_id', settings.senderId);
 
+                let fetchOptions: RequestInit = {
+                    method: settings.method
+                };
+
                 if (settings.method === 'GET') {
-                    url = `${url}?${params.toString()}`;
-                    console.log(`[SMS MOCK] Sending GET to ${mobile}: ${url}`);
+                    // Append params to URL for GET
+                    const separator = url.includes('?') ? '&' : '?';
+                    url = `${url}${separator}${params.toString()}`;
                 } else {
-                    console.log(`[SMS MOCK] Sending POST to ${mobile}`, Object.fromEntries(params));
+                    // For POST, use body
+                    fetchOptions.body = params;
+                    // fetchOptions.headers = { 'Content-Type': 'application/x-www-form-urlencoded' };
                 }
+
+                // Perform the actual request
+                // Using 'no-cors' might be needed if the SMS gateway doesn't support CORS headers, 
+                // but 'no-cors' makes the response opaque (we won't know if it succeeded).
+                // We'll try standard fetch first.
+                await fetch(url, fetchOptions);
+                
                 successCount++;
                 if (!client.psid.startsWith('ext_')) {
                     sentPsids.push(client.psid);
                 }
             } catch (e) {
                 console.error("SMS Failed for", mobile, e);
+                // Continue to next number even if one fails
             }
 
             setSendingProgress(Math.round(((i + 1) / finalRecipients.length) * 100));
-            await new Promise(r => setTimeout(r, 100));
+            // Slight delay to prevent rate limiting
+            await new Promise(r => setTimeout(r, 200));
         }
 
         setIsSending(false);
@@ -315,7 +331,7 @@ const BulkSmsManager: React.FC<BulkSmsManagerProps> = ({
             onUpdateSmsStats(sentPsids);
         }
 
-        alert(`Successfully sent ${successCount} messages!`);
+        alert(`Campaign Completed! Sent attempts: ${successCount}. Check console if any failed.`);
         setMessage('');
         setSendingProgress(0);
         setActiveTab('history');

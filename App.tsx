@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
@@ -21,6 +22,7 @@ import WebhookSimulator from './components/WebhookSimulator';
 import PublicLeadForm from './components/PublicLeadForm';
 import ClientPortal from './components/ClientPortal';
 import DailyBriefingModal from './components/DailyBriefingModal';
+import { AlertTriangle, RefreshCw } from 'lucide-react'; // Added icons
 
 // Types
 import { 
@@ -37,6 +39,7 @@ const App: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isLoading, setIsLoading] = useState(true);
+  const [connectionError, setConnectionError] = useState<string | null>(null); // New state for errors
   
   // Data States (Initially Empty, will fill from DB)
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -85,8 +88,9 @@ const App: React.FC = () => {
   const fetchData = async () => {
       try {
           setIsLoading(true);
+          setConnectionError(null);
           const response = await fetch(`${API_BASE_URL}/index.php?action=get_all_data`);
-          if (!response.ok) throw new Error("Network response was not ok");
+          if (!response.ok) throw new Error(`Server returned ${response.status}: ${response.statusText}`);
           const data = await response.json();
           
           let loadedConversations: Conversation[] = [];
@@ -137,8 +141,9 @@ const App: React.FC = () => {
               })));
           }
           
-      } catch (error) {
-          console.error("Failed to fetch data, switching to Demo Mode:", error);
+      } catch (error: any) {
+          console.error("Failed to fetch data:", error);
+          setConnectionError(error.message || "Unknown error occurred connecting to database.");
           
           // --- FALLBACK DUMMY DATA FOR DEMO MODE ---
           setConversations([
@@ -348,7 +353,30 @@ const App: React.FC = () => {
     <div className="flex bg-slate-50 min-h-screen font-sans text-slate-900">
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
       
-      <main className="flex-1 ml-64 p-8 overflow-y-auto h-screen">
+      <main className="flex-1 ml-64 p-8 overflow-y-auto h-screen relative">
+        {/* CONNECTION ERROR BANNER */}
+        {connectionError && (
+            <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-6 rounded-r shadow-sm flex justify-between items-center">
+                <div className="flex items-center gap-3">
+                    <AlertTriangle className="text-red-600" size={24} />
+                    <div>
+                        <h3 className="font-bold text-red-800">Database Connection Failed</h3>
+                        <p className="text-sm text-red-700">
+                            Could not fetch data from <code>index.php</code>. Showing <span className="font-bold">Demo Data</span>.
+                            <br/>
+                            <span className="text-xs opacity-75">Error: {connectionError}</span>
+                        </p>
+                    </div>
+                </div>
+                <button 
+                    onClick={fetchData} 
+                    className="flex items-center gap-2 px-4 py-2 bg-white text-red-600 border border-red-200 rounded hover:bg-red-100 transition-colors text-sm font-bold"
+                >
+                    <RefreshCw size={14} /> Retry
+                </button>
+            </div>
+        )}
+
         {showBriefing && activeTab === 'dashboard' && (
             <DailyBriefingModal 
                 conversations={conversations}
